@@ -1,0 +1,59 @@
+name: Unpack Fat2Fit source (one-time)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/bootstrap-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - name: Verify archive and extract to repository root
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import stat
+          import zipfile
+          archive = pathlib.Path('Fat2Fit-0.4-verified.zip')
+          if not archive.is_file():
+              raise SystemExit('Expected source archive is missing; no changes made')
+          with zipfile.ZipFile(archive) as z:
+              members = [v for v in z.infolist() if not v.is_dir()]
+              names = {v.filename for v in members}
+              required = {'Fat2Fit/package.json', 'Fat2Fit/src/app/page.tsx', 'Fat2Fit/supabase/migrations/20261105104923_fat2fit_coach_sets_and_workout_videos.sql'}
+              if not required.issubset(names) or len(members) < 40:
+                  raise SystemExit('Archive validation failed')
+              for item in members:
+                  path = pathlib.PurePosixPath(item.filename)
+                  if len(path.parts) < 2 or path.parts[0] != 'Fat2Fit' or '..' in path.parts or path.is_absolute():
+                      raise SystemExit('Unsafe archive path')
+                  if stat.S_IFMT(item.external_attr >> 16) == stat.S_IFLNK:
+                      raise SystemExit('Archive contains symbolic links')
+                  rel = pathlib.Path(*path.parts[1:])
+                  if rel.name in {'.env.local', '.env.production', '.env'}:
+                      raise SystemExit('Archive contains a secret environment file')
+                  dest = pathlib.Path('.') / rel
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  with z.open(item) as src, dest.open('wb') as dst:
+                      import shutil
+                      shutil.copyfileobj(src, dst)
+          print('Source files extracted:', len(members))
+          PY
+      - name: Commit extracted sources
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -- Fat2Fit-0.4-verified.zip
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'Extract Fat2Fit 0.4 Next.js source'
+          git push origin HEAD:main
