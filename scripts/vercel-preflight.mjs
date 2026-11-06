@@ -20,7 +20,13 @@ if(db){
  try{
   const uri=new URL(db);
   if(!['postgresql:','postgres:'].includes(uri.protocol)||!uri.password||!uri.hostname)errors.push('DATABASE_URL: invalid PostgreSQL URI');
-  else if(uri.port!=='6543')warnings.push('DATABASE_URL: not port 6543; Supabase on Vercel normally uses transaction pooler');
+  else {
+    if(uri.port!=='6543')warnings.push('DATABASE_URL: not port 6543; Supabase on Vercel normally uses transaction pooler');
+    if(uri.hostname.endsWith('.pooler.supabase.com')){
+      const ca=required('SUPABASE_DB_CA_CERT')?.replace(/\\n/g,'\n').trim()||'';
+      if(!ca.startsWith('-----BEGIN CERTIFICATE-----')||!ca.endsWith('-----END CERTIFICATE-----'))errors.push('SUPABASE_DB_CA_CERT: paste full root CA PEM from Supabase SSL Configuration');
+    }
+  }
  }catch{errors.push('DATABASE_URL: invalid URL');}
 }
 const token=required('TELEGRAM_BOT_TOKEN');
