@@ -11,16 +11,16 @@ export const demoExercises:Exercise[]=[
 ];
 const titles=(ru:string,en:string,sr:string):Localized=>({ru,en,sr});
 export const demoTemplates:WorkoutTemplate[]=[
-{id:'push',workspaceId:'demo-workspace',title:titles('Верх тела · A','Upper body · A','Gornji deo · A'),items:[{id:'pi1',exerciseId:'bench',sets:3,reps:10,weight:50,rest:90},{id:'pi2',exerciseId:'incline',sets:3,reps:12,weight:16,rest:75},{id:'pi3',exerciseId:'pull',sets:3,reps:12,weight:35,rest:90}]},
-{id:'legs',workspaceId:'demo-workspace',title:titles('Ноги · B','Leg day · B','Noge · B'),items:[{id:'li1',exerciseId:'squat',sets:3,reps:8,weight:40,rest:120},{id:'li2',exerciseId:'leg',sets:3,reps:12,weight:70,rest:90},{id:'li3',exerciseId:'plank',sets:3,reps:45,weight:0,rest:45}]}
+{id:'push',workspaceId:'demo-workspace',workoutType:'strength',title:titles('Верх тела · A','Upper body · A','Gornji deo · A'),items:[{id:'pi1',exerciseId:'bench',sets:3,reps:10,weight:50,rest:90},{id:'pi2',exerciseId:'incline',sets:3,reps:12,weight:16,rest:75},{id:'pi3',exerciseId:'pull',sets:3,reps:12,weight:35,rest:90}]},
+{id:'legs',workspaceId:'demo-workspace',workoutType:'strength',title:titles('Ноги · B','Leg day · B','Noge · B'),items:[{id:'li1',exerciseId:'squat',sets:3,reps:8,weight:40,rest:120},{id:'li2',exerciseId:'leg',sets:3,reps:12,weight:70,rest:90},{id:'li3',exerciseId:'plank',sets:3,reps:45,weight:0,rest:45}]}
 ];
-export const demoStudents:Student[]=[{id:'anna',name:'Анна',joined:true},{id:'max',name:'Максим',joined:true},{id:'igor',name:'Игорь',joined:true}];
+export const demoStudents:Student[]=[{id:'anna',name:'Анна',joined:true,historyVisibility:'full'},{id:'max',name:'Максим',joined:true,historyVisibility:'full'},{id:'igor',name:'Игорь',joined:true,historyVisibility:'full'}];
 export function dateShift(n=0){const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function snap(t:WorkoutTemplate){return t.items.map(i=>({...i,id:`${t.id}-${i.id}-${Math.random().toString(36).slice(2,6)}`,logs:[]}));}
 export function seedDemo():DemoData{return {exercises:structuredClone(demoExercises),templates:structuredClone(demoTemplates),students:structuredClone(demoStudents),assignments:[
-{id:'demo-a1',workspaceId:'demo-workspace',studentId:'anna',templateId:'push',title:demoTemplates[0].title,date:dateShift(),status:'planned',items:snap(demoTemplates[0]),note:'',effort:6},
-{id:'demo-a2',workspaceId:'demo-workspace',studentId:'max',templateId:'legs',title:demoTemplates[1].title,date:dateShift(1),status:'planned',items:snap(demoTemplates[1]),note:'',effort:6},
-{id:'demo-a3',workspaceId:'demo-workspace',studentId:'igor',templateId:'push',title:demoTemplates[0].title,date:dateShift(-3),status:'completed',items:snap(demoTemplates[0]).map(i=>({...i,logs:Array.from({length:i.sets},(_,j)=>({setIndex:j,reps:i.reps,weight:i.weight,done:true}))})),note:'Хорошая тренировка',effort:7}
+{id:'demo-a1',workspaceId:'demo-workspace',studentId:'anna',templateId:'push',title:demoTemplates[0].title,workoutType:'strength',date:dateShift(),status:'planned',items:snap(demoTemplates[0]),note:'',effort:6},
+{id:'demo-a2',workspaceId:'demo-workspace',studentId:'max',templateId:'legs',title:demoTemplates[1].title,workoutType:'strength',date:dateShift(1),status:'planned',items:snap(demoTemplates[1]),note:'',effort:6},
+{id:'demo-a3',workspaceId:'demo-workspace',studentId:'igor',templateId:'push',title:demoTemplates[0].title,workoutType:'strength',date:dateShift(-3),status:'completed',items:snap(demoTemplates[0]).map(i=>({...i,logs:Array.from({length:i.sets},(_,j)=>({setIndex:j,reps:i.reps,weight:i.weight,done:true}))})),note:'Хорошая тренировка',effort:7}
 ]};}
 export const demoWorkspaceId='demo-workspace';
 export const isLang=(s:string):s is Language=>['ru','en','sr'].includes(s);
