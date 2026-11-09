@@ -3,15 +3,15 @@ export const langs:Language[]=['ru','en','cg'];
 export const dictionary = {
   coach:['Тренер','Coach','Trener'], student:['Ученик','Student','Učenik'],
   dashboard:['Главная','Home','Početna'], students:['Ученики','Students','Učenici'],
-  exercises:['Упражнения','Exercises','Vežbe'], templates:['Шаблоны','Templates','Šabloni'],
-  reports:['Отчёты','Reports','Izveštaji'], workout:['Тренировка','Workout','Trening'],
+  exercises:['Упражнения','Exercises','Vježbe'], templates:['Шаблоны','Templates','Šabloni'],
+  reports:['Отчёты','Reports','Izvještaji'], workout:['Тренировка','Workout','Trening'],
   today:['Сегодня','Today','Danas'], assign:['Назначить тренировку','Assign workout','Dodeli trening'],
-  createExercise:['Добавить упражнение','Add exercise','Dodaj vežbu'],
+  createExercise:['Добавить упражнение','Add exercise','Dodaj vježbu'],
   createTemplate:['Создать шаблон','New template','Novi šablon'],
   noStudents:['Пока нет учеников','No students yet','Još nema učenika'],
   noTemplates:['Пока нет шаблонов','No templates yet','Još nema šablona'],
   noAssignments:['Нет назначенных тренировок','No assigned workouts','Nema dodeljenih treninga'],
-  search:['Поиск упражнений','Search exercises','Pretraži vežbe'],
+  search:['Поиск упражнений','Search exercises','Pretraži vježbe'],
   add:['Добавить','Add','Dodaj'], save:['Сохранить','Save','Sačuvaj'], cancel:['Отмена','Cancel','Otkaži'],
   name:['Название','Name','Naziv'], group:['Группа мышц','Muscle group','Mišićna grupa'],
   equipment:['Оборудование','Equipment','Oprema'], technique:['Техника','Technique','Tehnika'],
@@ -32,8 +32,8 @@ export const dictionary = {
   invite:['Пригласить ученика','Invite student','Pozovi učenika'],
   copyInvite:['Ссылка для приглашения','Invitation link','Link za poziv'],
   dashboardIntro:['Управляйте тренировками и результатами','Manage workouts and progress','Upravljajte treninzima i napretkom'],
-  studentIntro:['Ваша следующая тренировка','Your next workout','Vaš sledeći trening'],
-  addFirst:['Создайте первое упражнение','Create your first exercise','Napravite prvu vežbu'],
+  studentIntro:['Ваша следующая тренировка','Your next workout','Vaš sljedeći trening'],
+  addFirst:['Создайте первое упражнение','Create your first exercise','Napravite prvu vježbu'],
   preview:['ДЕМО','DEMO','DEMO'],
   error:['Ошибка. Попробуйте ещё раз.','Something went wrong. Try again.','Došlo je do greške. Pokušajte ponovo.'],
   signedIn:['Подключено к серверу','Connected to server','Povezano sa serverom'],
@@ -43,7 +43,7 @@ export const dictionary = {
 } as const;
 export type Phrase = keyof typeof dictionary;
 export function t(key:Phrase, lang:Language):string {return dictionary[key][langs.indexOf(lang)];}
-export function localized(v:Localized, lang:Language):string{return v[lang]||v.ru||v.en||v.cg||v.cg||v.sr||'';}
+export function localized(v:Localized, lang:Language):string{return v[lang]||v.ru||v.en||v.cg||(v as Record<string,string>).sr||'';}
 export function exText(ex:Exercise, lang:Language, key:'name'|'description'|'faq'):string{
   return ex.translations[lang]?.[key] || ex.translations.ru?.[key] || ex.translations.en?.[key] || Object.values(ex.translations).find(x=>x[key])?.[key] || '';
 }
