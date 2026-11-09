@@ -135,3 +135,26 @@ input,textarea,select {max-width:100%}
 #phone .measurement-record strong{font-size:13px}
 #phone .measurement-record .muted{font-size:11px}
 @media(max-width:350px){#phone .measurements .spread{flex-wrap:wrap}#phone .invite-actions .btn{font-size:12px}}
+
+/* Fat2Fit 0.6: iOS Telegram navigation and native date input sizing */
+#phone .bottom.student{grid-template-columns:repeat(4,minmax(0,1fr))}
+#phone .bottom.student button{min-width:0;padding:8px 1px}
+#phone .bottom.student .txt{font-size:clamp(9px,2.45vw,11px);white-space:nowrap;line-height:1.15;letter-spacing:-.2px}
+#phone #stage,#phone .view,#phone .card,#phone .stack,#phone form,#phone .field{min-width:0;max-width:100%}
+#phone input[type="date"],#phone input[type="datetime-local"]{
+ display:block;width:100%;max-width:100%;min-width:0!important;
+ box-sizing:border-box;-webkit-appearance:none;appearance:none;
+ font-size:16px;padding:10px 9px;overflow:hidden;
+}
+#phone input[type="date"]::-webkit-date-and-time-value{min-width:0;max-width:100%;text-align:left}
+#phone input[type="date"]::-webkit-datetime-edit{min-width:0;max-width:100%;padding:0}
+#phone .field-grid,#phone .measurement-grid,#phone .two-col{min-width:0;max-width:100%}
+#phone .role-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin:5px 0 2px;background:#e6ecf7;border-radius:13px;padding:4px}
+#phone .role-switch button{min-width:0;padding:10px 4px;border:0;background:transparent;color:#61758e;border-radius:10px;font-weight:800;font-size:12px}
+#phone .role-switch button[aria-pressed="true"]{background:#fff;color:#2368e9;box-shadow:0 2px 8px #12324a16}
+#phone .history-privacy{border:1px solid #dfe9f9;background:#f9fbff;border-radius:14px;padding:12px;display:grid;gap:8px}
+#phone .history-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#phone .history-summary div{background:#fff;border:1px solid #e3eaf3;border-radius:13px;padding:12px 6px;text-align:center;min-width:0}
+#phone .history-summary strong{display:block;font-size:21px;color:#172b4a}
+#phone .history-summary span{font-size:11px;overflow-wrap:anywhere;color:#697e97}
+@media(max-width:350px){#phone .bottom.student .txt{font-size:9px}}
