@@ -169,7 +169,7 @@ export default function Fat2Fit(){
  const assign=async(e:React.FormEvent)=>{e.preventDefault();if(!assignStudent||!assignTemplate)return setError(copy('Выберите ученика и шаблон','Select a student and template','Izaberite učenika i šablon',lang));
   setBusy(true);try{
    if(DEMO){const templ=data.templates.find(t=>t.id===assignTemplate);if(!templ)throw Error('No template');
-    updateData(d=>({...d,assignments:[...d.assignments,{id:uid(),workspaceId:demoWorkspaceId,studentId:assignStudent,templateId:templ.id,title:templ.title,date:assignDate,status:'planned',items:templ.items.map(i=>({...i,id:uid(),logs:[]})),note:'',effort:6}]}));}
+    updateData(d=>({...d,assignments:[...d.assignments,{id:uid(),workspaceId:demoWorkspaceId,studentId:assignStudent,templateId:templ.id,title:templ.title,workoutType:templ.workoutType,date:assignDate,status:'planned',items:templ.items.map(i=>({...i,id:uid(),logs:[]})),note:'',effort:6}]}));}
    else{await api('/assignments','POST',{workspaceId,studentId:assignStudent,templateId:assignTemplate,date:assignDate});await refresh();}
    if(assignStudent===studentId&&canCoach){switchMode('student');}else selectScreen('students');
    notify(copy('Тренировка назначена','Workout assigned','Trening je dodeljen',lang));
