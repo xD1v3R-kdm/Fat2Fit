@@ -8,9 +8,19 @@ import {videoExtension} from '@/lib/video-rules';
 
 type Screen='dashboard'|'students'|'studentDetail'|'coachWorkout'|'exercises'|'exerciseDetail'|'exerciseNew'|'templates'|'templateNew'|'assign'|'reports'|'reportDetail'|'workout'|'history';
 type WorkoutVideo={id:string;itemId:string;setIndex:number|null;status:'uploading'|'pending'|'approved'|'changes_requested';reviewNote:string;createdAt:string;studentId:string;url:string};
+type BodyMeasurement={id:string;measuredOn:string;weightKg:number|null;waistCm:number|null;chestCm:number|null;bicepsCm:number|null;thighCm:number|null;hipsCm:number|null;note:string;updatedAt:string};
+type MeasureKey='weightKg'|'waistCm'|'chestCm'|'bicepsCm'|'thighCm'|'hipsCm';
+const measureFields:{key:MeasureKey;label:[string,string,string];unit:string;min:number;max:number}[]=[
+ {key:'weightKg',label:['Вес','Weight','Težina'],unit:'kg',min:10,max:500},
+ {key:'waistCm',label:['Объём талии','Waist','Struk'],unit:'cm',min:20,max:300},
+ {key:'chestCm',label:['Объём груди','Chest','Grudi'],unit:'cm',min:20,max:300},
+ {key:'bicepsCm',label:['Объём бицепса','Biceps','Biceps'],unit:'cm',min:10,max:150},
+ {key:'thighCm',label:['Объём бедра','Thigh','Butina'],unit:'cm',min:10,max:200},
+ {key:'hipsCm',label:['Объём бёдер','Hips','Kukovi'],unit:'cm',min:20,max:300}
+];
 type DraftExercise={group:string;equipment:string;photoUrl:string;videoUrl:string;translations:Exercise['translations']};
 type DraftTemplate={title:Localized;items:WorkoutItem[]};
-type WebApp={initData:string;initDataUnsafe?:{start_param?:string};ready?:()=>void;expand?:()=>void};
+type WebApp={initData:string;initDataUnsafe?:{start_param?:string};ready?:()=>void;expand?:()=>void;openTelegramLink?:(url:string)=>void};
 declare global {interface Window {Telegram?:{WebApp?:WebApp}}}
 const DEMO=process.env.NEXT_PUBLIC_DEMO_MODE==='true';
 const newDraft=():DraftExercise=>({group:'chest',equipment:'',photoUrl:'',videoUrl:'',translations:{ru:{name:'',description:'',faq:''},en:{name:'',description:'',faq:''},sr:{name:'',description:'',faq:''}}});
@@ -43,6 +53,12 @@ export default function Fat2Fit(){
  const [editingExerciseId,setEditingExerciseId]=useState(''),[editingTemplateId,setEditingTemplateId]=useState('');
  const [assignStudent,setAssignStudent]=useState(''),[assignTemplate,setAssignTemplate]=useState(''),[assignDate,setAssignDate]=useState(dateShift());
  const [inviteLink,setInviteLink]=useState(''),[workoutDraft,setWorkoutDraft]=useState<Record<string,{reps:number;weight:number}>>({}),[note,setNote]=useState(''),[effort,setEffort]=useState(6);
+ const [bodyMeasurements,setBodyMeasurements]=useState<Record<string,BodyMeasurement[]>>({});
+ const [bodyCounts,setBodyCounts]=useState<Record<string,number>>({});
+ const [measureDate,setMeasureDate]=useState(dateShift());
+ const [measureDraft,setMeasureDraft]=useState<Partial<Record<MeasureKey,string>>>({});
+ const [measureNote,setMeasureNote]=useState('');
+ const [measureBusy,setMeasureBusy]=useState(false);
  const [returnScreen,setReturnScreen]=useState<Screen>('exercises');
  const [videosByAssignment,setVideosByAssignment]=useState<Record<string,WorkoutVideo[]>>({});
  const [reviewNotes,setReviewNotes]=useState<Record<string,string>>({});
@@ -136,6 +152,106 @@ export default function Fat2Fit(){
   else{const result=await api<{link:string}>('/invitations','POST',{workspaceId});setInviteLink(result.link);}}
   catch(e){fail(e);}finally{setBusy(false);}
  };
+ const clipboardCopy=async(text:string)=>{
+  try{
+   if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);}
+   else throw Error('Clipboard API not available');
+   notify(copy('Скопировано','Copied','Kopirano',lang));
+   return;
+  }catch{
+   const element=document.createElement('textarea');
+   element.value=text;element.setAttribute('readonly','');
+   element.style.position='fixed';element.style.top='0';element.style.left='0';element.style.opacity='0';
+   document.body.appendChild(element);element.focus();element.select();element.setSelectionRange(0,text.length);
+   const success=document.execCommand('copy');
+   document.body.removeChild(element);
+   if(success)notify(copy('Скопировано','Copied','Kopirano',lang));
+   else setError(copy('Не удалось автоматически скопировать. Нажмите на поле со ссылкой и выберите «Копировать».','Copy failed. Select the link field and use Copy.','Kopiranje nije uspelo. Izaberite vezu i kopirajte.',lang));
+  }
+ };
+ const shareInvite=async()=>{
+  if(!inviteLink)return;
+  const tg=window.Telegram?.WebApp;
+  if(tg?.openTelegramLink){
+   tg.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(inviteLink));
+  }else if(navigator.share){
+   try{await navigator.share({title:'Fat2Fit',url:inviteLink});}catch(e){if((e as Error)?.name!=='AbortError')fail(e);}
+  }else{
+   await clipboardCopy(inviteLink);
+  }
+ };
+ const loadBody=useCallback(async(id:string,ws:string)=>{
+  const response=await api<{measurements:BodyMeasurement[];completedWorkouts:number}>(`/measurements?workspaceId=${encodeURIComponent(ws)}&studentId=${encodeURIComponent(id)}`);
+  setBodyMeasurements(old=>({...old,[id]:response.measurements}));
+  setBodyCounts(old=>({...old,[id]:response.completedWorkouts}));
+ },[]);
+ useEffect(()=>{
+  if(!ready||DEMO||!workspaceId)return;
+  const id=mode==='coach'&&screen==='studentDetail'?selectedStudent:mode==='student'&&['dashboard','history'].includes(screen)?studentId:'';
+  if(id)void loadBody(id,workspaceId).catch(fail);
+ },[ready,mode,screen,workspaceId,selectedStudent,studentId,loadBody]);
+ const saveBody=async(id:string)=>{
+  if(!id||measureBusy)return;
+  setError('');
+  const payload:Record<string,unknown>={workspaceId,studentId:id,measuredOn:measureDate,note:measureNote.trim()};
+  let count=0;
+  for(const field of measureFields){
+   const raw=(measureDraft[field.key]||'').trim().replace(',','.');
+   if(!raw)continue;
+   const val=Number(raw);
+   if(!Number.isFinite(val)||val<field.min||val>field.max){
+    setError(copy('Проверьте значение: ','Check value: ','Proverite vrednost: ',lang)+field.label[lang==='ru'?0:lang==='en'?1:2]);
+    return;
+   }
+   payload[field.key]=val;count++;
+  }
+  if(!count){setError(copy('Добавьте хотя бы один замер','Enter at least one measurement','Dodajte bar jedno merenje',lang));return;}
+  setMeasureBusy(true);
+  try{
+   if(DEMO){
+    const row:BodyMeasurement={id:uid(),measuredOn:measureDate,weightKg:null,waistCm:null,chestCm:null,bicepsCm:null,thighCm:null,hipsCm:null,note:measureNote.trim(),updatedAt:new Date().toISOString()};
+    for(const key of measureFields.map(x=>x.key)) if(typeof payload[key]==='number')row[key]=payload[key] as number;
+    setBodyMeasurements(old=>({...old,[id]:[row,...(old[id]||[]).filter(x=>x.measuredOn!==measureDate)].sort((a,b)=>b.measuredOn.localeCompare(a.measuredOn))}));
+   }else{
+    await api('/measurements','POST',payload);
+    await loadBody(id,workspaceId);
+   }
+   setMeasureDraft({});setMeasureNote('');setMeasureDate(dateShift());
+   notify(mode==='student'?copy('Результаты отправлены тренеру','Results sent to coach','Rezultati poslati treneru',lang):copy('Замеры сохранены','Measurements saved','Merenja sačuvana',lang));
+  }catch(e){fail(e);}finally{setMeasureBusy(false);}
+ };
+ const formatBody=(m:BodyMeasurement)=>measureFields.filter(f=>m[f.key]!=null).map(f=>`${f.label[lang==='ru'?0:lang==='en'?1:2]}: ${m[f.key]} ${f.unit}`).join('\n');
+ const shareBody=async(id:string)=>{
+  const rows=bodyMeasurements[id]||[];
+  const latest=rows[0];
+  const title=mode==='coach'?data.students.find(s=>s.id===id)?.name||'Fat2Fit':me?.name||'Fat2Fit';
+  const completed=bodyCounts[id]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
+  const report=`Fat2Fit — ${title}\n${copy('Завершено тренировок','Completed workouts','Završeni treninzi',lang)}: ${completed}${latest?'\n'+latest.measuredOn+'\n'+formatBody(latest):''}`;
+  if(navigator.share){
+   try{await navigator.share({text:report,title:'Fat2Fit'});return;}
+   catch(e){if((e as Error)?.name==='AbortError')return;}
+  }
+  await clipboardCopy(report);
+ };
+ const measurementPanel=(id:string)=>{
+  const rows=bodyMeasurements[id]||[];
+  const total=bodyCounts[id]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
+  const fieldLabel=(f:typeof measureFields[number])=>f.label[lang==='ru'?0:lang==='en'?1:2];
+  return <section className="card stack measurements">
+   <div className="spread"><h2 className="section-title">{copy('Замеры и прогресс','Measurements & progress','Merenja i napredak',lang)}</h2><span className="badge blue">{total} {copy('тренировок','workouts','treninga',lang)}</span></div>
+   <p className="small muted">{mode==='student'?copy('Сохранённые результаты доступны вашему тренеру.','Your coach can see saved measurements.','Trener vidi sačuvane rezultate.',lang):copy('Фиксируйте замеры ученика. История доступна и самому ученику.','Record student measurements. Students can see their history.','Beležite merenja učenika.',lang)}</p>
+   <label className="field">{copy('Дата замера','Measurement date','Datum merenja',lang)}<input type="date" className="input" value={measureDate} max={dateShift()} onChange={e=>setMeasureDate(e.target.value)}/></label>
+   <div className="measurement-grid">
+    {measureFields.map(f=><label className="field" key={f.key}>{fieldLabel(f)}, {f.unit}<input className="input" type="number" inputMode="decimal" min={f.min} max={f.max} step="0.1" placeholder="—" value={measureDraft[f.key]||''} onChange={e=>setMeasureDraft(d=>({...d,[f.key]:e.target.value}))}/></label>)}
+   </div>
+   <label className="field">{copy('Комментарий (необязательно)','Note (optional)','Napomena (opciono)',lang)}<textarea maxLength={500} value={measureNote} onChange={e=>setMeasureNote(e.target.value)}/></label>
+   <button className="btn primary full" type="button" disabled={measureBusy} onClick={()=>void saveBody(id)}>{measureBusy?'…':mode==='student'?copy('Сохранить и отправить тренеру','Save & send to coach','Sačuvaj i pošalji treneru',lang):copy('Сохранить замеры','Save measurements','Sačuvaj merenja',lang)}</button>
+   <div className="spread"><h3 className="section-title">{copy('История замеров','Measurement history','Istorija merenja',lang)}</h3><button type="button" className="link-button" onClick={()=>void shareBody(id)}>{copy('Поделиться сводкой','Share summary','Podeli sažetak',lang)}</button></div>
+   {rows.slice(0,12).map(m=><div className="measurement-record" key={m.id}><b>{isoDate(m.measuredOn,lang)}</b><div className="measurement-grid small">{measureFields.filter(f=>m[f.key]!=null).map(f=><div key={f.key}><span className="muted">{fieldLabel(f)}</span><strong>{m[f.key]} {f.unit}</strong></div>)}</div>{m.note&&<p className="small muted">{m.note}</p>}</div>)}
+   {!rows.length&&<p className="small muted">{copy('Замеров пока нет','No measurements yet','Još nema merenja',lang)}</p>}
+   <p className="small muted">{copy('Повторное сохранение на ту же дату обновит существующую запись.','Saving again on the same date updates that entry.','Ponovno čuvanje za isti datum menja zapis.',lang)}</p>
+  </section>;
+ };
  const loadVideos=useCallback(async(assignmentId:string)=>{
    if(DEMO)return;
    const videos=await api<WorkoutVideo[]>(`/assignments/${assignmentId}/videos`);
@@ -220,9 +336,9 @@ export default function Fat2Fit(){
  return <div className="view stack">{header(copy('РАБОЧЕЕ ПРОСТРАНСТВО','WORKSPACE','RADNI PROSTOR',lang),t('dashboard',lang))}<section className="hero"><div className="eyebrow">{t('today',lang)} · {isoDate(dateShift(),lang)}</div><h2>{copy('Всё под контролем','Keep everyone on track','Sve pod kontrolom',lang)}</h2><p>{t('dashboardIntro',lang)}</p><button className="btn dark" onClick={()=>{setAssignStudent(data.students[0]?.id||'');setAssignTemplate(data.templates[0]?.id||'');selectScreen('assign');}}>＋ {t('assign',lang)}</button></section><div className="stats"><div className="stat-card"><strong>{data.students.length}</strong><span>{t('students',lang)}</span></div><div className="stat-card"><strong>{completed}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{data.templates.length}</strong><span>{t('templates',lang)}</span></div></div>{pending.length>0&&<div className="card stack"><b>🎥 {copy('Видео ждут проверки','Videos awaiting review','Video čeka pregled',lang)} · {pending.reduce((n,a)=>n+(a.pendingVideos||0),0)}</b>{pending.slice(0,3).map(a=><button className="tile" type="button" key={`review-${a.id}`} onClick={()=>{setReportId(a.id);selectScreen('reportDetail');}}><span className="grow">{templateTitle(a)} · {data.students.find(s=>s.id===a.studentId)?.name||'—'}</span><span className="badge blue">{a.pendingVideos}</span></button>)}</div>}<div className="quick"><button onClick={()=>{setEditingExerciseId('');setDraftExercise(newDraft());selectScreen('exerciseNew');}}><b style={{display:'block',fontSize:23}}>＋</b><strong>{t('createExercise',lang)}</strong></button><button onClick={()=>{setEditingTemplateId('');setDraftTemplate({title:{ru:''},items:[]});selectScreen('templateNew');}}><b style={{display:'block',fontSize:23}}>▤</b><strong>{t('createTemplate',lang)}</strong></button></div><div className="spread"><h2 className="section-title">{t('students',lang)}</h2><button className="link-button" onClick={()=>selectScreen('students')}>{t('open',lang)} →</button></div>{data.students.slice(0,3).map(s=><button key={s.id} className="tile" onClick={()=>{setSelectedStudent(s.id);selectScreen('studentDetail');}}>{avatar(s.name)}<span className="grow"><b>{s.name}</b><span className="small muted" style={{display:'block'}}>{assignmentsFor(s.id).length} {t('workout',lang).toLowerCase()}</span></span>›</button>)}</div>;
  }
  function studentsView(){if(screen==='studentDetail'){
- const list=assignmentsFor(selectedStudent);return <div className="view stack">{back('students')}{header(t('students',lang),currentStudent?.name||'—')}<div className="stats"><div className="stat-card"><strong>{list.length}</strong><span>{t('workout',lang)}</span></div><div className="stat-card"><strong>{list.filter(a=>a.status==='completed').length}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{percent(list.filter(a=>a.status==='completed').length,list.length)}%</strong><span>{t('progress',lang)}</span></div></div><button className="btn primary full" onClick={()=>{setAssignStudent(selectedStudent);setAssignTemplate(data.templates[0]?.id||'');selectScreen('assign');}}>＋ {t('assign',lang)}</button><h2 className="section-title">{copy('Тренировки ученика','Student workouts','Treninzi učenika',lang)}</h2>{list.filter(a=>['planned','active'].includes(a.status)).map(a=><button className="btn coach-workout-link full" type="button" key={`coach-${a.id}`} onClick={()=>{setReportId(a.id);setWorkoutDraft({});selectScreen('coachWorkout');}}>{copy('✓ Отмечать подходы','✓ Track sets','✓ Beleži serije',lang)} · {templateTitle(a)}</button>)}<h2 className="section-title">{t('history',lang)}</h2>{list.map(a=><button key={a.id} className="tile" onClick={()=>{setReportId(a.id);selectScreen('reportDetail');}}><span className="grow"><b>{templateTitle(a)}</b><span className="small muted" style={{display:'block'}}>{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()}</span></span>{statusLabel(a)}</button>)}{!list.length&&<div className="card empty">{t('noAssignments',lang)}</div>}</div>;
+ const list=assignmentsFor(selectedStudent);return <div className="view stack">{back('students')}{header(t('students',lang),currentStudent?.name||'—')}<div className="stats"><div className="stat-card"><strong>{list.length}</strong><span>{t('workout',lang)}</span></div><div className="stat-card"><strong>{list.filter(a=>a.status==='completed').length}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{percent(list.filter(a=>a.status==='completed').length,list.length)}%</strong><span>{t('progress',lang)}</span></div></div>{measurementPanel(selectedStudent)}<button className="btn primary full" onClick={()=>{setAssignStudent(selectedStudent);setAssignTemplate(data.templates[0]?.id||'');selectScreen('assign');}}>＋ {t('assign',lang)}</button><h2 className="section-title">{copy('Тренировки ученика','Student workouts','Treninzi učenika',lang)}</h2>{list.filter(a=>['planned','active'].includes(a.status)).map(a=><button className="btn coach-workout-link full" type="button" key={`coach-${a.id}`} onClick={()=>{setReportId(a.id);setWorkoutDraft({});selectScreen('coachWorkout');}}>{copy('✓ Отмечать подходы','✓ Track sets','✓ Beleži serije',lang)} · {templateTitle(a)}</button>)}<h2 className="section-title">{t('history',lang)}</h2>{list.map(a=><button key={a.id} className="tile" onClick={()=>{setReportId(a.id);selectScreen('reportDetail');}}><span className="grow"><b>{templateTitle(a)}</b><span className="small muted" style={{display:'block'}}>{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()}</span></span>{statusLabel(a)}</button>)}{!list.length&&<div className="card empty">{t('noAssignments',lang)}</div>}</div>;
  }
- return <div className="view stack">{header(copy('ВАША КОМАНДА','YOUR CLIENTS','VAŠI KLIJENTI',lang),t('students',lang))}<button className="btn primary full" disabled={busy} onClick={()=>void invite()}>＋ {t('invite',lang)}</button>{inviteLink&&<div className="card stack"><b>{t('copyInvite',lang)}</b><input className="input" aria-label={t('copyInvite',lang)} readOnly value={inviteLink} onFocus={e=>e.currentTarget.select()}/><small>{copy('Одноразовая ссылка действительна 7 дней','Single-use link expires in 7 days','Link važi 7 dana, samo jednom',lang)}</small></div>}<h2 className="section-title">{t('students',lang)} · {data.students.length}</h2>{data.students.map(s=><button key={s.id} className="tile" onClick={()=>{setSelectedStudent(s.id);selectScreen('studentDetail');}}>{avatar(s.name)}<span className="grow"><b>{s.name}</b><span className="small muted" style={{display:'block'}}>{assignmentsFor(s.id).filter(a=>a.status==='completed').length}/{assignmentsFor(s.id).length} {t('complete',lang).toLowerCase()}</span><ProgressBar value={percent(assignmentsFor(s.id).filter(a=>a.status==='completed').length,assignmentsFor(s.id).length)}/></span><span>›</span></button>)}{!data.students.length&&<div className="card empty">{t('noStudents',lang)}</div>}</div>;
+ return <div className="view stack">{header(copy('ВАША КОМАНДА','YOUR CLIENTS','VAŠI KLIJENTI',lang),t('students',lang))}<button className="btn primary full" disabled={busy} onClick={()=>void invite()}>＋ {t('invite',lang)}</button>{inviteLink&&<div className="card stack"><b>{t('copyInvite',lang)}</b><input className="input invitation-input" aria-label={t('copyInvite',lang)} readOnly value={inviteLink} onFocus={e=>e.currentTarget.select()}/><div className="invite-actions"><button type="button" className="btn primary" onClick={()=>void clipboardCopy(inviteLink)}>{copy('Скопировать','Copy link','Kopiraj link',lang)}</button><button type="button" className="btn" onClick={()=>void shareInvite()}>{copy('Поделиться','Share','Podeli',lang)}</button></div><small>{copy('Одноразовая ссылка действительна 7 дней','Single-use link expires in 7 days','Link važi 7 dana, samo jednom',lang)}</small></div>}<h2 className="section-title">{t('students',lang)} · {data.students.length}</h2>{data.students.map(s=><button key={s.id} className="tile" onClick={()=>{setSelectedStudent(s.id);selectScreen('studentDetail');}}>{avatar(s.name)}<span className="grow"><b>{s.name}</b><span className="small muted" style={{display:'block'}}>{assignmentsFor(s.id).filter(a=>a.status==='completed').length}/{assignmentsFor(s.id).length} {t('complete',lang).toLowerCase()}</span><ProgressBar value={percent(assignmentsFor(s.id).filter(a=>a.status==='completed').length,assignmentsFor(s.id).length)}/></span><span>›</span></button>)}{!data.students.length&&<div className="card empty">{t('noStudents',lang)}</div>}</div>;
  }
  function exercisesView(){if(screen==='exerciseDetail'&&currentExercise){const ex=currentExercise;return <div className="view stack">{back(returnScreen)}{header(localized(groups[ex.group]||groups.other,lang),exText(ex,lang,'name'))}{ex.photoUrl?<img className="exercise-photo" src={safeMedia(ex.photoUrl)} alt={exText(ex,lang,'name')}/>:<div className="screen-cover">✦</div>}<div className="card stack"><h2 className="section-title">{t('technique',lang)}</h2><p className="detail-paragraph">{exText(ex,lang,'description')||'—'}</p><hr className="divider"/><h2 className="section-title">{t('faq',lang)}</h2><p className="detail-paragraph">{exText(ex,lang,'faq')||'—'}</p></div><h2 className="section-title">{t('video',lang)}</h2><Video url={ex.videoUrl} lang={lang}/>{mode==='coach'&&<button type="button" className="btn full" onClick={()=>{setEditingExerciseId(ex.workspaceId?ex.id:'');setDraftExercise({group:ex.group,equipment:ex.equipment,photoUrl:ex.photoUrl,videoUrl:ex.videoUrl,translations:structuredClone(ex.translations)});setDraftLang(lang);selectScreen('exerciseNew');}}>{ex.workspaceId?copy('Редактировать упражнение','Edit exercise','Uredi vežbu',lang):copy('Создать свою версию','Create my own version','Napravi svoju verziju',lang)}</button>}</div>;
  }
@@ -241,7 +357,7 @@ export default function Fat2Fit(){
  function workoutView(){if(!shownAssignment)return <div className="view stack">{header(t('today',lang),t('workout',lang))}<div className="card empty">{t('noAssignments',lang)}</div></div>;
  const a=shownAssignment;return <div className="view stack">{mode==='coach'&&back('studentDetail')}{header(mode==='coach'?copy('Совместная тренировка','Coach-assisted workout','Trening sa trenerom',lang):isoDate(a.date,lang),templateTitle(a))}<div className="spread"><span className="small muted">{t('sets',lang)}</span><b>{doneSets(a)}/{totalSets(a)}</b></div><ProgressBar value={percent(doneSets(a),totalSets(a))}/>{a.items.map((item,n)=><div key={item.id} className="exercise stack"><div className="row"><span className="ex-number">{n+1}</span><span className="grow"><b>{exerciseName(item.exerciseId)}</b><span className="small muted" style={{display:'block'}}>{item.sets} × {item.reps} · {item.weight} kg · {item.rest}s</span></span><button type="button" className="link-button" onClick={()=>{setExerciseId(item.exerciseId);setReturnScreen(mode==='coach'?'coachWorkout':'workout');selectScreen('exerciseDetail');}}>ⓘ</button></div><div className="set-row small muted" style={{marginTop:12}}><span>№</span><span style={{textAlign:'center'}}>{t('reps',lang)}</span><span style={{textAlign:'center'}}>{t('weight',lang)}</span><span>✓</span></div>{Array.from({length:item.sets},(_,i)=>{const log=item.logs.find(l=>l.setIndex===i);const key=`${item.id}-${i}`;const values=workoutDraft[key]||{reps:log?.reps??item.reps,weight:log?.weight??item.weight};return <div className="set-row" key={i}><b className="small">{i+1}</b><input aria-label={`${t('reps',lang)} ${i+1}`} type="number" inputMode="numeric" min="0" max="1000" value={values.reps} onChange={e=>setWorkoutDraft(d=>({...d,[key]:{...values,reps:num(e.target.value)}}))}/><input aria-label={`${t('weight',lang)} ${i+1}`} type="number" inputMode="decimal" min="0" max="9999" step="0.5" value={values.weight} onChange={e=>setWorkoutDraft(d=>({...d,[key]:{...values,weight:num(e.target.value)}}))}/><button className={log?.done?'checked':''} type="button" disabled={busy} aria-pressed={Boolean(log?.done)} aria-label={`Set ${i+1}: ${log?.done?'done':'not done'}`} onClick={()=>void toggleSet(a,item,i)}>{log?.done?'✓':'○'}</button></div>;})}{mode==='student'&&videoPicker(a,item)}{(videosByAssignment[a.id]||[]).some(v=>v.itemId===item.id)&&videoReview(a,mode==='coach',item.id)}</div>)}<div className="card stack"><label className="field">{mode==='coach'?copy('Комментарий тренера','Coach note','Napomena trenera',lang):t('comment',lang)}<textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={2000}/></label><label className="field">RPE · {effort}/10<input type="range" min="1" max="10" value={effort} onChange={e=>setEffort(Number(e.target.value))}/></label><button className="btn primary full" disabled={!doneSets(a)||busy} onClick={()=>void finishWorkout(a)}>{t('finish',lang)}</button></div></div>;
  }
- function historyView(){const completed=myAssignments.filter(a=>a.status==='completed');return <div className="view stack">{header(copy('РЕЗУЛЬТАТЫ','YOUR RESULTS','REZULTATI',lang),t('history',lang))}{completed.map(a=><div key={a.id} className="card stack"><div className="spread"><b>{templateTitle(a)}</b>{statusLabel(a)}</div><div className="small muted">{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()} · RPE {a.effort}/10</div>{a.items.map(i=><div className="spread small" key={i.id}><span>{exerciseName(i.exerciseId)}</span><b>{i.logs.filter(l=>l.done).length}/{i.sets}</b></div>)}{a.note&&<p className="detail-paragraph">{a.note}</p>}{a.items.map(item=><div key={`upload-${item.id}`}>{videoPicker(a,item)}</div>)}<button type="button" className="btn full" onClick={()=>void loadVideos(a.id).catch(fail)}>{copy('Показать проверки','View feedback','Prikaži pregled',lang)}</button>{(videosByAssignment[a.id]||[]).length>0&&videoReview(a,false)}</div>)}{!completed.length&&<div className="card empty">{t('noResults',lang)}</div>}</div>;
+ function historyView(){const completed=myAssignments.filter(a=>a.status==='completed');return <div className="view stack">{header(copy('РЕЗУЛЬТАТЫ','YOUR RESULTS','REZULTATI',lang),t('history',lang))}{measurementPanel(studentId)}{completed.map(a=><div key={a.id} className="card stack"><div className="spread"><b>{templateTitle(a)}</b>{statusLabel(a)}</div><div className="small muted">{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()} · RPE {a.effort}/10</div>{a.items.map(i=><div className="spread small" key={i.id}><span>{exerciseName(i.exerciseId)}</span><b>{i.logs.filter(l=>l.done).length}/{i.sets}</b></div>)}{a.note&&<p className="detail-paragraph">{a.note}</p>}{a.items.map(item=><div key={`upload-${item.id}`}>{videoPicker(a,item)}</div>)}<button type="button" className="btn full" onClick={()=>void loadVideos(a.id).catch(fail)}>{copy('Показать проверки','View feedback','Prikaži pregled',lang)}</button>{(videosByAssignment[a.id]||[]).length>0&&videoReview(a,false)}</div>)}{!completed.length&&<div className="card empty">{t('noResults',lang)}</div>}</div>;
  }
  if(!ready)return <div id="phone"><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view"><div className="card">{copy('Загрузка…','Loading…','Učitavanje…',lang)}</div></main></div>;
  if(!DEMO&&!workspaceId)return <div id="phone"><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view stack"><div className="card stack">
