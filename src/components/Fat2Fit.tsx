@@ -8,10 +8,11 @@ import {videoExtension} from '@/lib/video-rules';
 
 type Screen='dashboard'|'students'|'studentDetail'|'coachWorkout'|'exercises'|'exerciseDetail'|'exerciseNew'|'templates'|'templateNew'|'assign'|'reports'|'reportDetail'|'workout'|'history';
 type WorkoutVideo={id:string;itemId:string;setIndex:number|null;status:'uploading'|'pending'|'approved'|'changes_requested';reviewNote:string;createdAt:string;studentId:string;url:string};
-type BodyMeasurement={id:string;measuredOn:string;weightKg:number|null;waistCm:number|null;chestCm:number|null;bicepsCm:number|null;thighCm:number|null;hipsCm:number|null;note:string;updatedAt:string};
-type MeasureKey='weightKg'|'waistCm'|'chestCm'|'bicepsCm'|'thighCm'|'hipsCm';
+type BodyMeasurement={id:string;measuredOn:string;weightKg:number|null;muscleMassKg:number|null;waistCm:number|null;chestCm:number|null;bicepsCm:number|null;thighCm:number|null;hipsCm:number|null;note:string;updatedAt:string};
+type MeasureKey='weightKg'|'muscleMassKg'|'waistCm'|'chestCm'|'bicepsCm'|'thighCm'|'hipsCm';
 const measureFields:{key:MeasureKey;label:[string,string,string];unit:string;min:number;max:number}[]=[
  {key:'weightKg',label:['Вес','Weight','Težina'],unit:'kg',min:10,max:500},
+ {key:'muscleMassKg',label:['Мышечная масса','Muscle mass','Mišićna masa'],unit:'kg',min:1,max:300},
  {key:'waistCm',label:['Объём талии','Waist','Struk'],unit:'cm',min:20,max:300},
  {key:'chestCm',label:['Объём груди','Chest','Grudi'],unit:'cm',min:20,max:300},
  {key:'bicepsCm',label:['Объём бицепса','Biceps','Biceps'],unit:'cm',min:10,max:150},
@@ -209,7 +210,7 @@ export default function Fat2Fit(){
   setMeasureBusy(true);
   try{
    if(DEMO){
-    const row:BodyMeasurement={id:uid(),measuredOn:measureDate,weightKg:null,waistCm:null,chestCm:null,bicepsCm:null,thighCm:null,hipsCm:null,note:measureNote.trim(),updatedAt:new Date().toISOString()};
+    const row:BodyMeasurement={id:uid(),measuredOn:measureDate,weightKg:null,muscleMassKg:null,waistCm:null,chestCm:null,bicepsCm:null,thighCm:null,hipsCm:null,note:measureNote.trim(),updatedAt:new Date().toISOString()};
     for(const key of measureFields.map(x=>x.key)) if(typeof payload[key]==='number')row[key]=payload[key] as number;
     setBodyMeasurements(old=>({...old,[id]:[row,...(old[id]||[]).filter(x=>x.measuredOn!==measureDate)].sort((a,b)=>b.measuredOn.localeCompare(a.measuredOn))}));
    }else{
