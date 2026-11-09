@@ -396,7 +396,72 @@ export default function Fat2Fit(){
  function templatesView(){if(screen==='templateNew')return <form className="view stack" onSubmit={e=>void addTemplate(e)}>{back('templates')}{header(copy('КОНСТРУКТОР','BUILDER','KREATOR',lang),t('createTemplate',lang))}<div className="card stack"><label className="field">{t('workoutTitle',lang)}<input className="input" required maxLength={120} value={draftTemplate.title[lang]||''} onChange={e=>setDraftTemplate(d=>({...d,title:{...d.title,[lang]:e.target.value}}))}/></label><label className="field">{copy('Тип тренировки','Workout category','Vrsta treninga',lang)}<select value={draftTemplate.workoutType} onChange={e=>setDraftTemplate(d=>({...d,workoutType:e.target.value as WorkoutType}))}>{trainingTypes.map(x=><option key={x} value={x}>{trainingLabel(x,lang)}</option>)}</select></label><div className="small muted">{copy('Название можно перевести, переключив язык приложения','Switch app language to add a translation','Promenite jezik da biste dodali prevod',lang)}</div></div><h2 className="section-title">{t('exercises',lang)} · {draftTemplate.items.length}</h2>{draftTemplate.items.map((i,n)=><div className="exercise" key={i.id}><div className="spread"><div className="row"><span className="ex-number">{n+1}</span><b>{exerciseName(i.exerciseId)}</b></div><button type="button" className="link-button" onClick={()=>setDraftTemplate(d=>({...d,items:d.items.filter(x=>x.id!==i.id)}))}>✕</button></div><div className="two-col" style={{marginTop:12}}>{(['sets','reps','weight','rest'] as const).map(f=><label className="field" key={f}>{t(f,lang)}<input type="number" className="input" min={f==='sets'||f==='reps'?1:0} max={f==='sets'?30:f==='reps'?1000:f==='weight'?9999:3600} value={i[f]} onChange={e=>updateTemplateItem(i.id,f,e.target.value)}/></label>)}</div></div>)}<h2 className="section-title">＋ {t('addToTemplate',lang)}</h2>{data.exercises.map(ex=>exCard(ex,()=>addTemplateExercise(ex)))}<button disabled={busy||!draftTemplate.items.length} className="btn primary full" type="submit">{t('save',lang)}</button></form>;
  return <div className="view stack">{header(copy('КОНСТРУКТОР','BUILDER','KREATOR',lang),t('templates',lang))}<button className="btn primary full" onClick={()=>{setEditingTemplateId('');setDraftTemplate({title:{ru:''},items:[],workoutType:'strength'});selectScreen('templateNew');}}>＋ {t('createTemplate',lang)}</button>{data.templates.map(w=><div className="card stack" key={w.id}><div className="row"><span className="ex-number">▤</span><span className="grow"><b>{templateTitle(w)}</b><span className="small muted" style={{display:'block'}}>{trainingLabel(w.workoutType||'strength',lang)} · {w.items.length} {t('exercises',lang).toLowerCase()} · {w.items.reduce((n,i)=>n+i.sets,0)} {t('sets',lang).toLowerCase()}</span></span></div><hr className="divider"/>{w.items.map(i=><div key={i.id} className="spread small"><span>{exerciseName(i.exerciseId)}</span><b>{i.sets} × {i.reps}</b></div>)}<button type="button" className="btn full" onClick={()=>{setEditingTemplateId(w.id);setDraftTemplate({title:structuredClone(w.title),items:structuredClone(w.items),workoutType:w.workoutType||'strength'});selectScreen('templateNew');}}>{copy('Изменить тип или упражнения','Edit category or exercises','Uredi vrstu ili vežbe',lang)}</button></div>)}{!data.templates.length&&<div className="card empty">{t('noTemplates',lang)}</div>}</div>;
  }
- function assignView(){return <form className="view stack" onSubmit={e=>void assign(e)}>{back('students')}{header(copy('ПЛАНИРОВАНИЕ','SCHEDULE','RASPORED',lang),t('assign',lang))}<div className="card stack"><label className="field">{t('studentPicker',lang)}<select required value={assignStudent} onChange={e=>setAssignStudent(e.target.value)}><option value="">—</option>{canCoach&&me&&<option value={me.id}>{copy('Я сам(а) · мои тренировки','Myself · my workouts','Ja · moji treninzi',lang)}</option>}{data.students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label className="field">{t('templatePicker',lang)}<select required value={assignTemplate} onChange={e=>setAssignTemplate(e.target.value)}><option value="">—</option>{data.templates.filter(w=>w.items.length).map(w=><option key={w.id} value={w.id}>{templateTitle(w)}</option>)}</select></label><label className="field">{t('date',lang)}<input type="date" className="input" required value={assignDate} onChange={e=>setAssignDate(e.target.value)}/></label></div><button type="submit" className="btn primary full" disabled={busy||(!data.students.length&&!canCoach)||!data.templates.some(w=>w.items.length)}>{t('assign',lang)}</button></form>;
+ function assignView(){
+  const manual=assignSource==='manual';
+  const addManual=(ex:Exercise)=>{
+   if(manualItems.length>=30)return setError(copy('Не больше 30 упражнений','30 exercises maximum','Najviše 30 vježbi',lang));
+   setManualItems(old=>[...old,{id:uid(),exerciseId:ex.id,sets:3,reps:10,weight:0,rest:90}]);
+  };
+  const updateManual=(id:string,key:'sets'|'reps'|'weight'|'rest',value:string)=>{
+   const min=key==='sets'||key==='reps'?1:0;
+   const max=key==='sets'?30:key==='reps'?1000:key==='weight'?9999:3600;
+   const amount=Math.min(max,Math.max(min,num(value)));
+   setManualItems(old=>old.map(i=>i.id===id?{...i,[key]:amount}:i));
+  };
+  return <form className="view stack" onSubmit={e=>void assign(e)}>
+   {back('students')}
+   {header(copy('ПЛАНИРОВАНИЕ','SCHEDULE','PLANIRANJE',lang),t('assign',lang))}
+   <div className="card stack">
+    <label className="field">{t('studentPicker',lang)}
+     <select required value={assignStudent} onChange={e=>setAssignStudent(e.target.value)}>
+      <option value="">—</option>
+      {canCoach&&me&&<option value={me.id}>{copy('Я сам(а) · мои тренировки','Myself · my workouts','Ja · moji treninzi',lang)}</option>}
+      {data.students.map(student=><option key={student.id} value={student.id}>{student.name}</option>)}
+     </select>
+    </label>
+    <p className="labelpad">{copy('Как создать тренировку','Workout source','Kako napraviti trening',lang)}</p>
+    <div className="assignment-mode" role="group" aria-label={copy('Источник тренировки','Workout source','Izbor treninga',lang)}>
+     <button type="button" aria-pressed={!manual} className={!manual?'active':''} onClick={()=>setAssignSource('template')}>{copy('По шаблону','From template','Iz šablona',lang)}</button>
+     <button type="button" aria-pressed={manual} className={manual?'active':''} onClick={()=>setAssignSource('manual')}>{copy('Набрать упражнения','Pick exercises','Odaberi vježbe',lang)}</button>
+    </div>
+    {!manual&&<label className="field">{t('templatePicker',lang)}
+     <select required value={assignTemplate} onChange={e=>setAssignTemplate(e.target.value)}>
+      <option value="">—</option>
+      {data.templates.filter(w=>w.items.length).map(w=><option key={w.id} value={w.id}>{templateTitle(w)}</option>)}
+     </select>
+    </label>}
+    {manual&&<>
+      <label className="field">{copy('Название тренировки','Workout title','Naziv treninga',lang)}
+       <input className="input" required maxLength={120} value={manualTitle} onChange={e=>setManualTitle(e.target.value)} placeholder={copy('Тренировка на сегодня','Today’s workout','Današnji trening',lang)} />
+      </label>
+      <label className="field">{copy('Тип тренировки','Workout type','Vrsta treninga',lang)}
+       <select value={manualType} onChange={e=>setManualType(e.target.value as WorkoutType)}>
+        {trainingTypes.map(k=><option key={k} value={k}>{trainingLabel(k,lang)}</option>)}
+       </select>
+      </label>
+    </>}
+    <label className="field">{t('date',lang)}<input type="date" className="input" required value={assignDate} onChange={e=>setAssignDate(e.target.value)}/></label>
+   </div>
+   {manual&&<>
+     <div className="spread"><h2 className="section-title">{copy('Добавленные упражнения','Selected exercises','Odabrane vježbe',lang)} · {manualItems.length}</h2></div>
+     {manualItems.map((item,index)=><div className="exercise stack" key={item.id}>
+      <div className="spread"><b>{index+1}. {exerciseName(item.exerciseId)}</b><button className="link-button" type="button" onClick={()=>setManualItems(v=>v.filter(x=>x.id!==item.id))} aria-label={copy('Убрать упражнение','Remove exercise','Ukloni vježbu',lang)}>✕</button></div>
+      <div className="two-col">{(['sets','reps','weight','rest'] as const).map(field=><label className="field" key={field}>{t(field,lang)}
+        <input type="number" className="input" inputMode="decimal" min={field==='sets'||field==='reps'?1:0} max={field==='sets'?30:field==='reps'?1000:field==='weight'?9999:3600} step={field==='weight'?'0.5':'1'} value={item[field]} onChange={e=>updateManual(item.id,field,e.target.value)}/>
+      </label>)}</div>
+     </div>)}
+     <h2 className="section-title">{copy('Добавить упражнения из каталога','Add exercises from library','Dodaj vježbe iz kataloga',lang)}</h2>
+     <input className="input" type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder={copy('Поиск по названию','Search by name','Pretraga po nazivu',lang)} aria-label={copy('Поиск упражнений','Search exercises','Pretraga vježbi',lang)}/>
+     {data.exercises.filter(ex=>!search||exText(ex,lang,'name').toLowerCase().includes(search.toLowerCase())).map(ex=><button className="exercise-tile" type="button" key={ex.id} onClick={()=>addManual(ex)}>
+      <span className="thumb"><span className="thumb-fallback">＋</span></span>
+      <span className="grow"><b>{exText(ex,lang,'name')}</b><small className="small muted" style={{display:'block'}}>{localized(groups[ex.group]||groups.other,lang)}</small></span>
+      <span className="badge blue">{copy('Добавить','Add','Dodaj',lang)}</span>
+     </button>)}
+   </>}
+   <button type="submit" className="btn primary full" disabled={busy||!assignStudent||(manual?!manualItems.length||!manualTitle.trim():!assignTemplate)}>
+    {t('assign',lang)}
+   </button>
+  </form>;
  }
  function reportView(){if(screen==='reportDetail'&&currentReport){const a=currentReport;return <div className="view stack">{back('reports')}{header(isoDate(a.date,lang),templateTitle(a))}<div className="spread">{statusLabel(a)}<b>{doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()}</b></div><ProgressBar value={percent(doneSets(a),totalSets(a))}/>{a.items.map((i,index)=><div className="card stack" key={i.id}><b>{index+1}. {exerciseName(i.exerciseId)}</b>{Array.from({length:i.sets},(_,j)=>{const l=i.logs.find(x=>x.setIndex===j);return <div className="spread small" key={j}><span>{j+1}. {l?.done?'✓':'○'}</span><span>{l?.reps??'—'} × {l?.weight??'—'} {t('weight',lang).split(',')[1]||'kg'}</span></div>;})}</div>)}{a.note&&<div className="card"><b>{t('comment',lang)}</b><p className="detail-paragraph">{a.note}</p></div>}{['planned','active'].includes(a.status)&&<button className="btn primary full" onClick={()=>{setWorkoutDraft({});selectScreen('coachWorkout');}}>{copy('Отмечать подходы ученика','Track student sets','Beleži serije učenika',lang)}</button>}{videoReview(a,true)}</div>;
  }
