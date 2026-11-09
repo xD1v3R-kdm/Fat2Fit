@@ -17,7 +17,7 @@ export async function POST(request:Request){try{
 const b=await request.json(),ws=b.workspaceId;
 const {userId}=await requireWorkspace(ws,['coach']);if(!isUuid(b.studentId)||!isUuid(b.templateId)||typeof b.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(b.date))throw new ApiError(400,'Invalid assignment');
 const id=await transaction(async c=>{
- const sm=await c.query('select 1 from memberships where workspace_id=$1 and user_id=$2 and (role=$3 or ($2=$4 and role='coach'))',[ws,b.studentId,'student',userId]);
+ const sm=await c.query("select 1 from memberships where workspace_id=$1 and user_id=$2 and (role=$3 or ($2=$4 and role='coach'))",[ws,b.studentId,'student',userId]);
  if(!sm.rowCount)throw new ApiError(403,'Student not in workspace');
  const tm=await c.query<{id:string;title:Record<string,string>;workout_type:string}>('select id,title,workout_type from workout_templates where id=$1 and workspace_id=$2',[b.templateId,ws]);
  if(!tm.rows[0])throw new ApiError(404,'Template not found');
