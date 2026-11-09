@@ -20,7 +20,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
 }catch(e){return jsonError(e);}}
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{
  const {id}=await params,userId=await requireUser(),b=await request.json();if(!isUuid(id)||!isUuid(b.itemId))throw new ApiError(400,'Invalid workout or exercise');
- const access=await permission(id,userId);if(access.role!=='student')throw new ApiError(403,'Only students can submit videos');
+ const access=await permission(id,userId);if(access.role!=='student'&&access.student_user_id!==userId)throw new ApiError(403,'Only the student can submit videos');
  const ext=validateVideoFile(b.mimeType,b.size),size=Number(b.size);
  const idx=b.setIndex===null||b.setIndex===undefined?null:Number(b.setIndex);
  if(idx!==null&&(!Number.isInteger(idx)||idx<0||idx>29))throw new ApiError(400,'Invalid set index');
