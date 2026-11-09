@@ -1,5 +1,5 @@
 import type {Language,Localized,Exercise} from './types';
-export const langs:Language[]=['ru','en','sr'];
+export const langs:Language[]=['ru','en','cg'];
 export const dictionary = {
   coach:['Тренер','Coach','Trener'], student:['Ученик','Student','Učenik'],
   dashboard:['Главная','Home','Početna'], students:['Ученики','Students','Učenici'],
@@ -43,8 +43,8 @@ export const dictionary = {
 } as const;
 export type Phrase = keyof typeof dictionary;
 export function t(key:Phrase, lang:Language):string {return dictionary[key][langs.indexOf(lang)];}
-export function localized(v:Localized, lang:Language):string{return v[lang]||v.ru||v.en||v.sr||'';}
+export function localized(v:Localized, lang:Language):string{return v[lang]||v.ru||v.en||v.cg||v.cg||v.sr||'';}
 export function exText(ex:Exercise, lang:Language, key:'name'|'description'|'faq'):string{
   return ex.translations[lang]?.[key] || ex.translations.ru?.[key] || ex.translations.en?.[key] || Object.values(ex.translations).find(x=>x[key])?.[key] || '';
 }
-export const groups: Record<string,Localized>={chest:{ru:'Грудь',en:'Chest',sr:'Grudi'},back:{ru:'Спина',en:'Back',sr:'Leđa'},legs:{ru:'Ноги',en:'Legs',sr:'Noge'},core:{ru:'Кор',en:'Core',sr:'Trup'},shoulders:{ru:'Плечи',en:'Shoulders',sr:'Ramena'},arms:{ru:'Руки',en:'Arms',sr:'Ruke'},cardio:{ru:'Кардио',en:'Cardio',sr:'Kardio'},other:{ru:'Другое',en:'Other',sr:'Ostalo'}};
+export const groups: Record<string,Localized>={chest:{ru:'Грудь',en:'Chest',cg:'Grudi'},back:{ru:'Спина',en:'Back',cg:'Leđa'},legs:{ru:'Ноги',en:'Legs',cg:'Noge'},core:{ru:'Кор',en:'Core',cg:'Trup'},shoulders:{ru:'Плечи',en:'Shoulders',cg:'Ramena'},arms:{ru:'Руки',en:'Arms',cg:'Ruke'},cardio:{ru:'Кардио',en:'Cardio',cg:'Kardio'},other:{ru:'Другое',en:'Other',cg:'Ostalo'}};
