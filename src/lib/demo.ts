@@ -23,4 +23,4 @@ export function seedDemo():DemoData{return {exercises:structuredClone(demoExerci
 {id:'demo-a3',workspaceId:'demo-workspace',studentId:'igor',templateId:'push',title:demoTemplates[0].title,workoutType:'strength',date:dateShift(-3),status:'completed',items:snap(demoTemplates[0]).map(i=>({...i,logs:Array.from({length:i.sets},(_,j)=>({setIndex:j,reps:i.reps,weight:i.weight,done:true}))})),note:'Хорошая тренировка',effort:7}
 ]};}
 export const demoWorkspaceId='demo-workspace';
-export const isLang=(s:string):s is Language=>['ru','en','sr'].includes(s);
+export const isLang=(s:string):s is Language=>['ru','en','cg'].includes(s);
