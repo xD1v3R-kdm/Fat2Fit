@@ -9,7 +9,7 @@ export async function POST(request:Request){
   if(typeof raw!=='string')throw new ApiError(400,'Missing initData');
   const u=validateTelegramInitData(raw,process.env.TELEGRAM_BOT_TOKEN||'');
   const name=[u.first_name,u.last_name].filter(Boolean).join(' ').trim().slice(0,120)||'Telegram user';
-  const language=['ru','en','sr'].includes((u.language_code||'').slice(0,2)) ? (u.language_code||'').slice(0,2) : 'en';
+  const language=['ru','en','cg'].includes((u.language_code||'').slice(0,2)) ? (u.language_code||'').slice(0,2) : 'en';
   const created=await query<{id:string}>('insert into users(telegram_id,display_name,language) values ($1,$2,$3) on conflict(telegram_id) do update set display_name=excluded.display_name returning id',[u.id,name,language]);
   const userId=created.rows[0].id;
   const coaches=(process.env.BOOTSTRAP_COACH_TELEGRAM_IDS||'').split(',').map(v=>v.trim());
