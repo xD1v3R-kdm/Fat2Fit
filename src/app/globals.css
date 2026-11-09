@@ -118,3 +118,20 @@ input,textarea,select {max-width:100%}
 @media(max-width:350px){#phone .topline{flex-wrap:nowrap!important}#phone .top-actions{width:auto;justify-content:flex-end}#phone .preview{display:none}#phone .role button{font-size:10px}}
 
 @media(max-width:450px){#phone .top .preview{display:none}}
+
+
+/* Fat2Fit 0.5: iOS-friendly invitation sharing and measurement history */
+#phone .invite-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#phone .invite-actions .btn{min-width:0;font-size:13px;padding:11px 5px;white-space:nowrap}
+#phone .invitation-input{width:100%;min-width:0;font-size:13px;direction:ltr}
+#phone .measurements .section-title{margin:0;font-size:16px}
+#phone .measurements .badge{flex-shrink:0;white-space:nowrap}
+#phone .measurement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#phone .measurement-grid .field{min-width:0}
+#phone .measurement-grid input{min-width:0;width:100%;font-size:16px}
+#phone .measurement-record{border:1px solid #e3eaf2;border-radius:15px;padding:12px;display:grid;gap:9px;background:#fafcff}
+#phone .measurement-record .measurement-grid{gap:7px}
+#phone .measurement-record .measurement-grid > div{display:flex;flex-direction:column;gap:3px;min-width:0}
+#phone .measurement-record strong{font-size:13px}
+#phone .measurement-record .muted{font-size:11px}
+@media(max-width:350px){#phone .measurements .spread{flex-wrap:wrap}#phone .invite-actions .btn{font-size:12px}}
