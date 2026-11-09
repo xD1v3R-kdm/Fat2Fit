@@ -1,6 +1,6 @@
 'use client';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import type {Assignment,AssignmentItem,Exercise,Language,Localized,Me,Role,SetLog,Student,WorkoutItem,WorkoutTemplate} from '@/lib/types';
+import type {Assignment,AssignmentItem,Exercise,Language,Localized,Me,Role,SetLog,Student,WorkoutItem,WorkoutTemplate,WorkoutType} from '@/lib/types';
 import {t,localized,exText,groups,type Phrase} from '@/lib/i18n';
 import {demoWorkspaceId,dateShift,isLang,seedDemo,type DemoData} from '@/lib/demo';
 import {api} from '@/lib/api-client';
@@ -20,7 +20,7 @@ const measureFields:{key:MeasureKey;label:[string,string,string];unit:string;min
  {key:'hipsCm',label:['Объём бёдер','Hips','Kukovi'],unit:'cm',min:20,max:300}
 ];
 type DraftExercise={group:string;equipment:string;photoUrl:string;videoUrl:string;translations:Exercise['translations']};
-type DraftTemplate={title:Localized;items:WorkoutItem[]};
+type DraftTemplate={title:Localized;items:WorkoutItem[];workoutType:WorkoutType};
 type WebApp={initData:string;initDataUnsafe?:{start_param?:string};ready?:()=>void;expand?:()=>void;openTelegramLink?:(url:string)=>void};
 declare global {interface Window {Telegram?:{WebApp?:WebApp}}}
 const DEMO=process.env.NEXT_PUBLIC_DEMO_MODE==='true';
@@ -28,6 +28,8 @@ const newDraft=():DraftExercise=>({group:'chest',equipment:'',photoUrl:'',videoU
 const uid=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():`temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const tabs:{screen:Screen;icon:string;key:Phrase}[]=[{screen:'dashboard',icon:'⌂',key:'dashboard'},{screen:'students',icon:'♧',key:'students'},{screen:'exercises',icon:'◈',key:'exercises'},{screen:'templates',icon:'▤',key:'templates'},{screen:'reports',icon:'▥',key:'reports'}];
 const studentTabs:{screen:Screen;icon:string;key:Phrase}[]=[{screen:'dashboard',icon:'⌂',key:'dashboard'},{screen:'workout',icon:'▤',key:'workout'},{screen:'exercises',icon:'◈',key:'exercises'},{screen:'history',icon:'▥',key:'history'}];
+const trainingTypes:WorkoutType[]=['strength','circuit','cardio'];
+const trainingLabel=(v:WorkoutType,lang:Language)=>v==='strength'?copy('Силовая','Strength','Snaga',lang):v==='circuit'?copy('Круговая','Circuit','Kružni',lang):copy('Кардио','Cardio','Kardio',lang);
 const emptyData:DemoData={exercises:[],students:[],templates:[],assignments:[]};
 const num=(v:string,def=0)=>{const n=Number(v);return Number.isFinite(n)?Math.max(0,n):def;};
 const isoDate=(s:string,l:Language)=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const [y,m,d]=s.split('-').map(Number);return new Intl.DateTimeFormat(l==='sr'?'sr-Latn-RS':l==='en'?'en-GB':'ru-RU',{day:'numeric',month:'short'}).format(new Date(y,m-1,d));};
@@ -50,7 +52,7 @@ export default function Fat2Fit(){
  const [studentId,setStudentId]=useState('anna'),[selectedStudent,setSelectedStudent]=useState(''),[exerciseId,setExerciseId]=useState(''),[reportId,setReportId]=useState('');
  const [search,setSearch]=useState(''),[group,setGroup]=useState('all');
  const [draftExercise,setDraftExercise]=useState<DraftExercise>(newDraft),[draftLang,setDraftLang]=useState<Language>('ru');
- const [draftTemplate,setDraftTemplate]=useState<DraftTemplate>({title:{ru:''},items:[]});
+ const [draftTemplate,setDraftTemplate]=useState<DraftTemplate>({title:{ru:''},items:[],workoutType:'strength'});
  const [editingExerciseId,setEditingExerciseId]=useState(''),[editingTemplateId,setEditingTemplateId]=useState('');
  const [assignStudent,setAssignStudent]=useState(''),[assignTemplate,setAssignTemplate]=useState(''),[assignDate,setAssignDate]=useState(dateShift());
  const [inviteLink,setInviteLink]=useState(''),[workoutDraft,setWorkoutDraft]=useState<Record<string,{reps:number;weight:number}>>({}),[note,setNote]=useState(''),[effort,setEffort]=useState(6);
@@ -64,8 +66,16 @@ export default function Fat2Fit(){
  const [videosByAssignment,setVideosByAssignment]=useState<Record<string,WorkoutVideo[]>>({});
  const [reviewNotes,setReviewNotes]=useState<Record<string,string>>({});
  const [uploadingVideo,setUploadingVideo]=useState(false);
+ const [historyAccess,setHistoryAccess]=useState<'full'|'summary'>('full');
+ const [workoutSummary,setWorkoutSummary]=useState({strength:0,circuit:0,cardio:0,total:0});
+ const [historyBusy,setHistoryBusy]=useState(false);
  const notify=(message:string)=>{setToast(message);setTimeout(()=>setToast(''),4200);};
  const fail=(e:unknown)=>setError(e instanceof Error?e.message:String(e));
+ const loadSummary=useCallback(async(ws:string,id:string)=>{
+  const response=await api<{counts:{strength:number;circuit:number;cardio:number};total:number;historyVisibility:'full'|'summary'}>(`/workout-summary?workspaceId=${encodeURIComponent(ws)}&studentId=${encodeURIComponent(id)}`);
+  setWorkoutSummary({...response.counts,total:response.total});
+  setHistoryAccess(response.historyVisibility);
+ },[]);
  const loadLive=useCallback(async(ws:string,role:Role)=>{
    const [exercises,templates,students,assignments]=await Promise.all([
     api<Exercise[]>(`/exercises?workspaceId=${encodeURIComponent(ws)}`),
@@ -96,13 +106,13 @@ export default function Fat2Fit(){
     const identity=await api<Me>('/me');if(!alive)return;
     setMe(identity);if(!stored||!isLang(stored))setLang(identity.language);
     const membership=identity.memberships.find(m=>m.role==='coach')||identity.memberships[0];
-    if(membership){setWorkspaceId(membership.workspaceId);setMode(membership.role);setStudentId(identity.id);await loadLive(membership.workspaceId,membership.role);}
+    if(membership){setWorkspaceId(membership.workspaceId);setMode(membership.role);setStudentId(identity.id);setHistoryAccess(membership.historyVisibility||'full');await loadLive(membership.workspaceId,membership.role);await loadSummary(membership.workspaceId,identity.id);}
     if(alive)setReady(true);
    }catch(e){if(alive){fail(e);setReady(true);}}
   };void init();return ()=>{alive=false;};
- },[loadLive]);
+ },[loadLive,loadSummary]);
  useEffect(()=>{if(!ready)return;try{localStorage.setItem('fat2fit-03-lang',lang);if(DEMO)localStorage.setItem('fat2fit-03-demo',JSON.stringify(data));}catch{}},[data,lang,ready]);
- const refresh=async()=>{if(!DEMO&&workspaceId)await loadLive(workspaceId,mode);};
+ const refresh=async()=>{if(!DEMO&&workspaceId){await loadLive(workspaceId,mode);if(mode==='student')await loadSummary(workspaceId,studentId);}};
  useEffect(()=>{
    if(DEMO||!workspaceId||!['workout','coachWorkout'].includes(screen))return;
    let fetching=false;
@@ -112,6 +122,21 @@ export default function Fat2Fit(){
 
  const changeLanguage=(l:Language)=>{setLang(l);if(!DEMO)void api('/me','PATCH',{language:l}).catch(fail);};
  const selectScreen=(s:Screen)=>{setScreen(s);setError('');setSearch('');setGroup('all');};
+ const canCoach=DEMO||Boolean(me?.memberships.some(m=>m.workspaceId===workspaceId&&m.role==='coach'));
+ const switchMode=(role:Role)=>{
+  if(role==='coach'&&!canCoach)return;
+  setMode(role);selectScreen('dashboard');setInviteLink('');
+  if(!DEMO&&workspaceId)void loadLive(workspaceId,role).then(()=>loadSummary(workspaceId,studentId)).catch(fail);
+ };
+ const setStudentHistory=async(id:string,value:'full'|'summary')=>{
+  if(historyBusy||!canCoach)return;
+  setHistoryBusy(true);
+  try{
+   if(DEMO)setData(d=>({...d,students:d.students.map(s=>s.id===id?{...s,historyVisibility:value}:s)}));
+   else{await api(`/students/${id}/settings`,'PATCH',{workspaceId,historyVisibility:value});await refresh();}
+   notify(copy('Настройки истории сохранены','History preference saved','Podešavanja istorije sačuvana',lang));
+  }catch(e){fail(e);}finally{setHistoryBusy(false);}
+ };
  const myAssignments=useMemo(()=>data.assignments.filter(a=>a.studentId===studentId).sort((a,b)=>b.date.localeCompare(a.date)),[data.assignments,studentId]);
  const activeAssignment=myAssignments.filter(a=>a.status==='planned'||a.status==='active').sort((a,b)=>a.date.localeCompare(b.date))[0];
  const currentExercise=data.exercises.find(e=>e.id===exerciseId);
@@ -146,7 +171,8 @@ export default function Fat2Fit(){
    if(DEMO){const templ=data.templates.find(t=>t.id===assignTemplate);if(!templ)throw Error('No template');
     updateData(d=>({...d,assignments:[...d.assignments,{id:uid(),workspaceId:demoWorkspaceId,studentId:assignStudent,templateId:templ.id,title:templ.title,date:assignDate,status:'planned',items:templ.items.map(i=>({...i,id:uid(),logs:[]})),note:'',effort:6}]}));}
    else{await api('/assignments','POST',{workspaceId,studentId:assignStudent,templateId:assignTemplate,date:assignDate});await refresh();}
-   selectScreen('students');notify(copy('Тренировка назначена','Workout assigned','Trening je dodeljen',lang));
+   if(assignStudent===studentId&&canCoach){switchMode('student');}else selectScreen('students');
+   notify(copy('Тренировка назначена','Workout assigned','Trening je dodeljen',lang));
   }catch(e){fail(e);}finally{setBusy(false);}
  };
  const invite=async()=>{setBusy(true);try{if(DEMO){setInviteLink('');notify(copy('Для реальной ссылки нужен Telegram и сервер','A real invite needs Telegram and server','Za pravi poziv potreban je Telegram i server',lang));}
@@ -333,7 +359,7 @@ export default function Fat2Fit(){
  function dashboard(){if(mode==='student')return <div className="view stack">{header(copy('ЛИЧНЫЙ КАБИНЕТ','YOUR ACCOUNT','MOJ NALOG',lang),t('dashboard',lang))}<div className="hero"><div className="eyebrow">{t('today',lang)} · {isoDate(dateShift(),lang)}</div><h2>{activeAssignment?templateTitle(activeAssignment):t('noAssignments',lang)}</h2><p>{activeAssignment?`${activeAssignment.items.length} ${t('exercises',lang).toLowerCase()} · ${totalSets(activeAssignment)} ${t('sets',lang).toLowerCase()}`:t('studentIntro',lang)}</p>{activeAssignment&&<button className="btn dark" onClick={()=>selectScreen('workout')}>{t('started',lang)} →</button>}</div><div className="stats"><div className="stat-card"><strong>{myAssignments.length}</strong><span>{t('workout',lang)}</span></div><div className="stat-card"><strong>{myAssignments.filter(a=>a.status==='completed').length}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{myAssignments.length?percent(myAssignments.filter(a=>a.status==='completed').length,myAssignments.length):0}%</strong><span>{t('progress',lang)}</span></div></div><h2 className="section-title">{t('history',lang)}</h2>{myAssignments.slice(0,3).map(a=><button key={a.id} className="tile" onClick={()=>{setReportId(a.id);selectScreen(a.status==='completed'?'history':'workout');}}><span className="grow"><b>{templateTitle(a)}</b><span className="small muted" style={{display:'block'}}>{isoDate(a.date,lang)}</span></span>{statusLabel(a)}</button>)}</div>;
  const completed=data.assignments.filter(a=>a.status==='completed').length;
  const pending=data.assignments.filter(a=>(a.pendingVideos||0)>0);
- return <div className="view stack">{header(copy('РАБОЧЕЕ ПРОСТРАНСТВО','WORKSPACE','RADNI PROSTOR',lang),t('dashboard',lang))}<section className="hero"><div className="eyebrow">{t('today',lang)} · {isoDate(dateShift(),lang)}</div><h2>{copy('Всё под контролем','Keep everyone on track','Sve pod kontrolom',lang)}</h2><p>{t('dashboardIntro',lang)}</p><button className="btn dark" onClick={()=>{setAssignStudent(data.students[0]?.id||'');setAssignTemplate(data.templates[0]?.id||'');selectScreen('assign');}}>＋ {t('assign',lang)}</button></section><div className="stats"><div className="stat-card"><strong>{data.students.length}</strong><span>{t('students',lang)}</span></div><div className="stat-card"><strong>{completed}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{data.templates.length}</strong><span>{t('templates',lang)}</span></div></div>{pending.length>0&&<div className="card stack"><b>🎥 {copy('Видео ждут проверки','Videos awaiting review','Video čeka pregled',lang)} · {pending.reduce((n,a)=>n+(a.pendingVideos||0),0)}</b>{pending.slice(0,3).map(a=><button className="tile" type="button" key={`review-${a.id}`} onClick={()=>{setReportId(a.id);selectScreen('reportDetail');}}><span className="grow">{templateTitle(a)} · {data.students.find(s=>s.id===a.studentId)?.name||'—'}</span><span className="badge blue">{a.pendingVideos}</span></button>)}</div>}<div className="quick"><button onClick={()=>{setEditingExerciseId('');setDraftExercise(newDraft());selectScreen('exerciseNew');}}><b style={{display:'block',fontSize:23}}>＋</b><strong>{t('createExercise',lang)}</strong></button><button onClick={()=>{setEditingTemplateId('');setDraftTemplate({title:{ru:''},items:[]});selectScreen('templateNew');}}><b style={{display:'block',fontSize:23}}>▤</b><strong>{t('createTemplate',lang)}</strong></button></div><div className="spread"><h2 className="section-title">{t('students',lang)}</h2><button className="link-button" onClick={()=>selectScreen('students')}>{t('open',lang)} →</button></div>{data.students.slice(0,3).map(s=><button key={s.id} className="tile" onClick={()=>{setSelectedStudent(s.id);selectScreen('studentDetail');}}>{avatar(s.name)}<span className="grow"><b>{s.name}</b><span className="small muted" style={{display:'block'}}>{assignmentsFor(s.id).length} {t('workout',lang).toLowerCase()}</span></span>›</button>)}</div>;
+ return <div className="view stack">{header(copy('РАБОЧЕЕ ПРОСТРАНСТВО','WORKSPACE','RADNI PROSTOR',lang),t('dashboard',lang))}<section className="hero"><div className="eyebrow">{t('today',lang)} · {isoDate(dateShift(),lang)}</div><h2>{copy('Всё под контролем','Keep everyone on track','Sve pod kontrolom',lang)}</h2><p>{t('dashboardIntro',lang)}</p><button className="btn dark" onClick={()=>{setAssignStudent(data.students[0]?.id||'');setAssignTemplate(data.templates[0]?.id||'');selectScreen('assign');}}>＋ {t('assign',lang)}</button></section><div className="stats"><div className="stat-card"><strong>{data.students.length}</strong><span>{t('students',lang)}</span></div><div className="stat-card"><strong>{completed}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{data.templates.length}</strong><span>{t('templates',lang)}</span></div></div>{pending.length>0&&<div className="card stack"><b>🎥 {copy('Видео ждут проверки','Videos awaiting review','Video čeka pregled',lang)} · {pending.reduce((n,a)=>n+(a.pendingVideos||0),0)}</b>{pending.slice(0,3).map(a=><button className="tile" type="button" key={`review-${a.id}`} onClick={()=>{setReportId(a.id);selectScreen('reportDetail');}}><span className="grow">{templateTitle(a)} · {data.students.find(s=>s.id===a.studentId)?.name||'—'}</span><span className="badge blue">{a.pendingVideos}</span></button>)}</div>}<div className="quick"><button onClick={()=>{setEditingExerciseId('');setDraftExercise(newDraft());selectScreen('exerciseNew');}}><b style={{display:'block',fontSize:23}}>＋</b><strong>{t('createExercise',lang)}</strong></button><button onClick={()=>{setEditingTemplateId('');setDraftTemplate({title:{ru:''},items:[],workoutType:'strength'});selectScreen('templateNew');}}><b style={{display:'block',fontSize:23}}>▤</b><strong>{t('createTemplate',lang)}</strong></button></div><div className="spread"><h2 className="section-title">{t('students',lang)}</h2><button className="link-button" onClick={()=>selectScreen('students')}>{t('open',lang)} →</button></div>{data.students.slice(0,3).map(s=><button key={s.id} className="tile" onClick={()=>{setSelectedStudent(s.id);selectScreen('studentDetail');}}>{avatar(s.name)}<span className="grow"><b>{s.name}</b><span className="small muted" style={{display:'block'}}>{assignmentsFor(s.id).length} {t('workout',lang).toLowerCase()}</span></span>›</button>)}</div>;
  }
  function studentsView(){if(screen==='studentDetail'){
  const list=assignmentsFor(selectedStudent);return <div className="view stack">{back('students')}{header(t('students',lang),currentStudent?.name||'—')}<div className="stats"><div className="stat-card"><strong>{list.length}</strong><span>{t('workout',lang)}</span></div><div className="stat-card"><strong>{list.filter(a=>a.status==='completed').length}</strong><span>{t('complete',lang)}</span></div><div className="stat-card"><strong>{percent(list.filter(a=>a.status==='completed').length,list.length)}%</strong><span>{t('progress',lang)}</span></div></div>{measurementPanel(selectedStudent)}<button className="btn primary full" onClick={()=>{setAssignStudent(selectedStudent);setAssignTemplate(data.templates[0]?.id||'');selectScreen('assign');}}>＋ {t('assign',lang)}</button><h2 className="section-title">{copy('Тренировки ученика','Student workouts','Treninzi učenika',lang)}</h2>{list.filter(a=>['planned','active'].includes(a.status)).map(a=><button className="btn coach-workout-link full" type="button" key={`coach-${a.id}`} onClick={()=>{setReportId(a.id);setWorkoutDraft({});selectScreen('coachWorkout');}}>{copy('✓ Отмечать подходы','✓ Track sets','✓ Beleži serije',lang)} · {templateTitle(a)}</button>)}<h2 className="section-title">{t('history',lang)}</h2>{list.map(a=><button key={a.id} className="tile" onClick={()=>{setReportId(a.id);selectScreen('reportDetail');}}><span className="grow"><b>{templateTitle(a)}</b><span className="small muted" style={{display:'block'}}>{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()}</span></span>{statusLabel(a)}</button>)}{!list.length&&<div className="card empty">{t('noAssignments',lang)}</div>}</div>;
@@ -346,7 +372,7 @@ export default function Fat2Fit(){
  return <div className="view stack">{header(copy('БИБЛИОТЕКА','LIBRARY','BIBLIOTEKA',lang),t('exercises',lang),copy('База упражнений с видео и описаниями','Exercises with videos and guides','Vežbe sa video zapisima i uputstvima',lang))}{mode==='coach'&&<button className="btn primary full" onClick={()=>{setDraftExercise(newDraft());setDraftLang(lang);selectScreen('exerciseNew');}}>＋ {t('createExercise',lang)}</button>}<input className="input" aria-label={t('search',lang)} placeholder={`⌕  ${t('search',lang)}`} value={search} onChange={e=>setSearch(e.target.value)}/><div className="chips">{['all',...Object.keys(groups)].map(g=><button type="button" className={`chip ${group===g?'on':''}`} key={g} onClick={()=>setGroup(g)}>{g==='all'?copy('Все','All','Sve',lang):localized(groups[g],lang)}</button>)}</div><div className="library-list">{data.exercises.filter(ex=>(group==='all'||ex.group===group)&&(!search||`${exText(ex,lang,'name')} ${ex.equipment}`.toLowerCase().includes(search.toLowerCase()))).map(ex=>exCard(ex,()=>{setExerciseId(ex.id);setReturnScreen('exercises');selectScreen('exerciseDetail');}))}</div>{!data.exercises.length&&<div className="card empty">{t('addFirst',lang)}</div>}</div>;
  }
  function templatesView(){if(screen==='templateNew')return <form className="view stack" onSubmit={e=>void addTemplate(e)}>{back('templates')}{header(copy('КОНСТРУКТОР','BUILDER','KREATOR',lang),t('createTemplate',lang))}<div className="card stack"><label className="field">{t('workoutTitle',lang)}<input className="input" required maxLength={120} value={draftTemplate.title[lang]||''} onChange={e=>setDraftTemplate(d=>({...d,title:{...d.title,[lang]:e.target.value}}))}/></label><div className="small muted">{copy('Название можно перевести, переключив язык приложения','Switch app language to add a translation','Promenite jezik da biste dodali prevod',lang)}</div></div><h2 className="section-title">{t('exercises',lang)} · {draftTemplate.items.length}</h2>{draftTemplate.items.map((i,n)=><div className="exercise" key={i.id}><div className="spread"><div className="row"><span className="ex-number">{n+1}</span><b>{exerciseName(i.exerciseId)}</b></div><button type="button" className="link-button" onClick={()=>setDraftTemplate(d=>({...d,items:d.items.filter(x=>x.id!==i.id)}))}>✕</button></div><div className="two-col" style={{marginTop:12}}>{(['sets','reps','weight','rest'] as const).map(f=><label className="field" key={f}>{t(f,lang)}<input type="number" className="input" min={f==='sets'||f==='reps'?1:0} max={f==='sets'?30:f==='reps'?1000:f==='weight'?9999:3600} value={i[f]} onChange={e=>updateTemplateItem(i.id,f,e.target.value)}/></label>)}</div></div>)}<h2 className="section-title">＋ {t('addToTemplate',lang)}</h2>{data.exercises.map(ex=>exCard(ex,()=>addTemplateExercise(ex)))}<button disabled={busy||!draftTemplate.items.length} className="btn primary full" type="submit">{t('save',lang)}</button></form>;
- return <div className="view stack">{header(copy('КОНСТРУКТОР','BUILDER','KREATOR',lang),t('templates',lang))}<button className="btn primary full" onClick={()=>{setEditingTemplateId('');setDraftTemplate({title:{ru:''},items:[]});selectScreen('templateNew');}}>＋ {t('createTemplate',lang)}</button>{data.templates.map(w=><div className="card stack" key={w.id}><div className="row"><span className="ex-number">▤</span><span className="grow"><b>{templateTitle(w)}</b><span className="small muted" style={{display:'block'}}>{w.items.length} {t('exercises',lang).toLowerCase()} · {w.items.reduce((n,i)=>n+i.sets,0)} {t('sets',lang).toLowerCase()}</span></span></div><hr className="divider"/>{w.items.map(i=><div key={i.id} className="spread small"><span>{exerciseName(i.exerciseId)}</span><b>{i.sets} × {i.reps}</b></div>)}</div>)}{!data.templates.length&&<div className="card empty">{t('noTemplates',lang)}</div>}</div>;
+ return <div className="view stack">{header(copy('КОНСТРУКТОР','BUILDER','KREATOR',lang),t('templates',lang))}<button className="btn primary full" onClick={()=>{setEditingTemplateId('');setDraftTemplate({title:{ru:''},items:[],workoutType:'strength'});selectScreen('templateNew');}}>＋ {t('createTemplate',lang)}</button>{data.templates.map(w=><div className="card stack" key={w.id}><div className="row"><span className="ex-number">▤</span><span className="grow"><b>{templateTitle(w)}</b><span className="small muted" style={{display:'block'}}>{w.items.length} {t('exercises',lang).toLowerCase()} · {w.items.reduce((n,i)=>n+i.sets,0)} {t('sets',lang).toLowerCase()}</span></span></div><hr className="divider"/>{w.items.map(i=><div key={i.id} className="spread small"><span>{exerciseName(i.exerciseId)}</span><b>{i.sets} × {i.reps}</b></div>)}</div>)}{!data.templates.length&&<div className="card empty">{t('noTemplates',lang)}</div>}</div>;
  }
  function assignView(){return <form className="view stack" onSubmit={e=>void assign(e)}>{back('students')}{header(copy('ПЛАНИРОВАНИЕ','SCHEDULE','RASPORED',lang),t('assign',lang))}<div className="card stack"><label className="field">{t('studentPicker',lang)}<select required value={assignStudent} onChange={e=>setAssignStudent(e.target.value)}><option value="">—</option>{data.students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label className="field">{t('templatePicker',lang)}<select required value={assignTemplate} onChange={e=>setAssignTemplate(e.target.value)}><option value="">—</option>{data.templates.filter(w=>w.items.length).map(w=><option key={w.id} value={w.id}>{templateTitle(w)}</option>)}</select></label><label className="field">{t('date',lang)}<input type="date" className="input" required value={assignDate} onChange={e=>setAssignDate(e.target.value)}/></label></div><button type="submit" className="btn primary full" disabled={busy||!data.students.length||!data.templates.some(w=>w.items.length)}>{t('assign',lang)}</button></form>;
  }
