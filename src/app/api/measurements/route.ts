@@ -3,12 +3,12 @@ import {query} from '@/lib/db';
 import {ApiError,isUuid,requireWorkspace,jsonError} from '@/lib/http';
 
 const bounds = {
- weightKg:[10,500], waistCm:[20,300], chestCm:[20,300],
+ weightKg:[10,500], muscleMassKg:[1,300], waistCm:[20,300], chestCm:[20,300],
  bicepsCm:[10,150], thighCm:[10,200], hipsCm:[20,300]
 } as const;
 
 type Measurement = {
- id:string; measuredOn:string; weightKg:number|null; waistCm:number|null;
+ id:string; measuredOn:string; weightKg:number|null; muscleMassKg:number|null; waistCm:number|null;
  chestCm:number|null; bicepsCm:number|null; thighCm:number|null;
  hipsCm:number|null; note:string; updatedAt:string;
 };
@@ -32,7 +32,7 @@ export async function GET(request:Request){
   const {workspaceId,studentId}=await context(url.searchParams.get('workspaceId')||'',url.searchParams.get('studentId'));
   const [rows,count]=await Promise.all([
    query<Measurement>(`select id,measured_on::text as "measuredOn",
-    weight_kg::float8 as "weightKg",waist_cm::float8 as "waistCm",
+    weight_kg::float8 as "weightKg",muscle_mass_kg::float8 as "muscleMassKg",waist_cm::float8 as "waistCm",
     chest_cm::float8 as "chestCm",biceps_cm::float8 as "bicepsCm",
     thigh_cm::float8 as "thighCm",hips_cm::float8 as "hipsCm",
     note,updated_at::text as "updatedAt"
@@ -55,7 +55,7 @@ export async function POST(request:Request){
     new Date(measuredOn).toISOString().slice(0,10)!==measuredOn||
     measuredOn>new Date(Date.now()+86400000).toISOString().slice(0,10))
     throw new ApiError(400,'Invalid measurement date');
-  const values:Record<keyof typeof bounds,number|null>={weightKg:null,waistCm:null,chestCm:null,bicepsCm:null,thighCm:null,hipsCm:null};
+  const values:Record<keyof typeof bounds,number|null>={weightKg:null,muscleMassKg:null,waistCm:null,chestCm:null,bicepsCm:null,thighCm:null,hipsCm:null};
   let hasValue=false;
   for(const key of Object.keys(bounds) as Array<keyof typeof bounds>){
    const value=body[key];
@@ -70,14 +70,14 @@ export async function POST(request:Request){
   if(note.length>500)throw new ApiError(400,'Note is too long');
   const r=await query<{id:string}>(`
     insert into body_measurements
-     (workspace_id,student_user_id,measured_on,weight_kg,waist_cm,chest_cm,biceps_cm,thigh_cm,hips_cm,note,recorded_by)
-    values ($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)
+     (workspace_id,student_user_id,measured_on,weight_kg,muscle_mass_kg,waist_cm,chest_cm,biceps_cm,thigh_cm,hips_cm,note,recorded_by)
+    values ($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11,$12)
     on conflict (workspace_id,student_user_id,measured_on) do update set
-     weight_kg=excluded.weight_kg,waist_cm=excluded.waist_cm,chest_cm=excluded.chest_cm,
+     weight_kg=excluded.weight_kg,muscle_mass_kg=excluded.muscle_mass_kg,waist_cm=excluded.waist_cm,chest_cm=excluded.chest_cm,
      biceps_cm=excluded.biceps_cm,thigh_cm=excluded.thigh_cm,hips_cm=excluded.hips_cm,
      note=excluded.note,recorded_by=excluded.recorded_by,updated_at=now()
     returning id
-  `,[workspaceId,studentId,measuredOn,values.weightKg,values.waistCm,values.chestCm,values.bicepsCm,values.thighCm,values.hipsCm,note,userId]);
+  `,[workspaceId,studentId,measuredOn,values.weightKg,values.muscleMassKg,values.waistCm,values.chestCm,values.bicepsCm,values.thighCm,values.hipsCm,note,userId]);
   return NextResponse.json({ok:true,id:r.rows[0].id},{status:201});
  }catch(e){return jsonError(e);}
 }
