@@ -19,7 +19,7 @@ async function context(workspaceId:string,requestedStudentId:unknown):Promise<Co
  const studentId=role==='student'?userId:requestedStudentId;
  if(!isUuid(studentId))throw new ApiError(400,'Invalid student');
  if(role==='student'&&requestedStudentId&&requestedStudentId!==userId)throw new ApiError(403,'You can only access your own measurements');
- if(role==='coach'){
+ if(role==='coach'&&studentId!==userId){
    const member=await query('select 1 from memberships where workspace_id=$1 and user_id=$2 and role=$3',[workspaceId,studentId,'student']);
    if(!member.rowCount)throw new ApiError(404,'Student not in this workspace');
  }
