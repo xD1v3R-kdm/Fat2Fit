@@ -154,21 +154,20 @@ export default function Fat2Fit(){
   catch(e){fail(e);}finally{setBusy(false);}
  };
  const clipboardCopy=async(text:string)=>{
-  try{
-   if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);}
-   else throw Error('Clipboard API not available');
-   notify(copy('Скопировано','Copied','Kopirano',lang));
-   return;
-  }catch{
-   const element=document.createElement('textarea');
-   element.value=text;element.setAttribute('readonly','');
-   element.style.position='fixed';element.style.top='0';element.style.left='0';element.style.opacity='0';
-   document.body.appendChild(element);element.focus();element.select();element.setSelectionRange(0,text.length);
-   const success=document.execCommand('copy');
-   document.body.removeChild(element);
-   if(success)notify(copy('Скопировано','Copied','Kopirano',lang));
-   else setError(copy('Не удалось автоматически скопировать. Нажмите на поле со ссылкой и выберите «Копировать».','Copy failed. Select the link field and use Copy.','Kopiranje nije uspelo. Izaberite vezu i kopirajte.',lang));
+  // Try synchronous selection first: iOS Telegram WebView often restricts
+  // asynchronous clipboard access after the tap's user activation expires.
+  const element=document.createElement('textarea');
+  element.value=text;element.setAttribute('readonly','');
+  element.style.position='fixed';element.style.top='0';element.style.left='0';element.style.opacity='0';
+  document.body.appendChild(element);element.focus();element.select();element.setSelectionRange(0,text.length);
+  let success=false;
+  try{success=document.execCommand('copy');}catch{}
+  document.body.removeChild(element);
+  if(!success&&navigator.clipboard?.writeText){
+   try{await navigator.clipboard.writeText(text);success=true;}catch{}
   }
+  if(success)notify(copy('Скопировано','Copied','Kopirano',lang));
+  else setError(copy('Автокопирование недоступно. Выделите ссылку в поле и скопируйте вручную или нажмите «Поделиться».','Automatic copy is unavailable. Select the link or tap Share.','Kopirajte vezu ručno ili izaberite Podeli.',lang));
  };
  const shareInvite=async()=>{
   if(!inviteLink)return;
@@ -248,7 +247,7 @@ export default function Fat2Fit(){
    <label className="field">{copy('Комментарий (необязательно)','Note (optional)','Napomena (opciono)',lang)}<textarea maxLength={500} value={measureNote} onChange={e=>setMeasureNote(e.target.value)}/></label>
    <button className="btn primary full" type="button" disabled={measureBusy} onClick={()=>void saveBody(id)}>{measureBusy?'…':mode==='student'?copy('Сохранить и отправить тренеру','Save & send to coach','Sačuvaj i pošalji treneru',lang):copy('Сохранить замеры','Save measurements','Sačuvaj merenja',lang)}</button>
    <div className="spread"><h3 className="section-title">{copy('История замеров','Measurement history','Istorija merenja',lang)}</h3><button type="button" className="link-button" onClick={()=>void shareBody(id)}>{copy('Поделиться сводкой','Share summary','Podeli sažetak',lang)}</button></div>
-   {rows.slice(0,12).map(m=><div className="measurement-record" key={m.id}><b>{isoDate(m.measuredOn,lang)}</b><div className="measurement-grid small">{measureFields.filter(f=>m[f.key]!=null).map(f=><div key={f.key}><span className="muted">{fieldLabel(f)}</span><strong>{m[f.key]} {f.unit}</strong></div>)}</div>{m.note&&<p className="small muted">{m.note}</p>}</div>)}
+   {rows.slice(0,12).map(m=><div className="measurement-record" key={m.id}><div className="spread"><b>{isoDate(m.measuredOn,lang)}</b><button type="button" className="link-button" onClick={()=>{const draft:Partial<Record<MeasureKey,string>>={};for(const f of measureFields)if(m[f.key]!=null)draft[f.key]=String(m[f.key]);setMeasureDate(m.measuredOn);setMeasureDraft(draft);setMeasureNote(m.note);}}>{copy('Изменить','Edit','Izmeni',lang)}</button></div><div className="measurement-grid small">{measureFields.filter(f=>m[f.key]!=null).map(f=><div key={f.key}><span className="muted">{fieldLabel(f)}</span><strong>{m[f.key]} {f.unit}</strong></div>)}</div>{m.note&&<p className="small muted">{m.note}</p>}</div>)}
    {!rows.length&&<p className="small muted">{copy('Замеров пока нет','No measurements yet','Još nema merenja',lang)}</p>}
    <p className="small muted">{copy('Повторное сохранение на ту же дату обновит существующую запись.','Saving again on the same date updates that entry.','Ponovno čuvanje za isti datum menja zapis.',lang)}</p>
   </section>;
