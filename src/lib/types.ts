@@ -1,11 +1,11 @@
-export type Language = 'ru' | 'en' | 'sr';
+export type Language = 'ru' | 'en' | 'cg';
 export type Role = 'coach' | 'student';
 export type WorkoutType = 'strength' | 'circuit' | 'cardio';
 export type HistoryVisibility = 'full' | 'summary';
 export type Localized = Partial<Record<Language,string>>;
 export type Exercise = {
   id:string; workspaceId:string|null; group:string; equipment:string;
-  photoUrl:string; videoUrl:string; translations:Record<string,{name:string;description:string;faq:string}>;
+  photoUrl:string; videoUrl:string; translations:Record<string,{name:string;description:string;faq:string}>;customized?:boolean;
 };
 export type WorkoutItem = { id:string; exerciseId:string; sets:number; reps:number; weight:number; rest:number; };
 export type WorkoutTemplate = {id:string;workspaceId:string;title:Localized;items:WorkoutItem[];workoutType:WorkoutType};
