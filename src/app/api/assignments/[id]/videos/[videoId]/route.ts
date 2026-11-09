@@ -11,7 +11,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string;
  if(v.role==='student'&&v.history_visibility==='summary'&&['completed','skipped'].includes(v.assignment_status))
   throw new ApiError(403,'Workout history is restricted');
  if(b.action==='confirm'){
-  if(v.role!=='student'||v.student_user_id!==userId)throw new ApiError(403,'Only the student can confirm upload');
+  if(v.student_user_id!==userId)throw new ApiError(403,'Only the student can confirm upload');
   if(v.status!=='uploading')throw new ApiError(409,'Video already confirmed');
   // Supabase Storage metadata is written after the upload completes.
   const object=await query<{name:string;size:string;mime:string}>(`select name,coalesce(metadata->>'size','0') as size,coalesce(metadata->>'mimetype','') as mime from storage.objects where bucket_id=$1 and name=$2`,[VIDEO_BUCKET,v.storage_path]);
