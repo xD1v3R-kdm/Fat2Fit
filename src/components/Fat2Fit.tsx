@@ -621,6 +621,7 @@ export default function Fat2Fit(){
   </div>;
  }
  const shown=data.assignments.filter(a=>{
+  if(reportFilter!=='all'&&a.studentId===studentId)return false;
   if(reportFilter==='today')return a.date===dateShift();
   if(reportFilter==='tomorrow')return a.date===dateShift(1);
   if(reportFilter==='workouts')return a.status==='completed'&&a.reviewStatus==='pending';
