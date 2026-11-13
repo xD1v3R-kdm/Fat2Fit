@@ -5,6 +5,7 @@ import {t,localized,exText,groups,type Phrase} from '@/lib/i18n';
 import {demoWorkspaceId,dateShift,isLang,seedDemo,type DemoData} from '@/lib/demo';
 import {api} from '@/lib/api-client';
 import {videoExtension} from '@/lib/video-rules';
+import {compareMeasurements} from '@/lib/report-schedule';
 
 type Screen='dashboard'|'students'|'studentDetail'|'coachWorkout'|'exercises'|'exerciseDetail'|'exerciseNew'|'templates'|'templateNew'|'assign'|'reports'|'reportDetail'|'workout'|'history';
 type WorkoutVideo={id:string;itemId:string;setIndex:number|null;status:'uploading'|'pending'|'approved'|'changes_requested';reviewNote:string;createdAt:string;studentId:string;url:string};
@@ -343,6 +344,50 @@ export default function Fat2Fit(){
   }
   await clipboardCopy(report);
  };
+ const measurementProgress=(id:string)=>{
+  const key=measurementKey(id);
+  const history=bodyMeasurements[key]||[];
+  const first=bodyFirst[key]||history[history.length-1]||null;
+  const latest=history[0]||null;
+  const canCompare=Boolean(first&&latest&&first.id!==latest.id);
+  const labels=lang==='ru'?0:lang==='en'?1:2;
+  const changes=first&&latest?compareMeasurements(first,latest,measureFields.map(f=>f.key)):{};
+  const fmt=(n:number)=>new Intl.NumberFormat(lang==='ru'?'ru-RU':lang==='en'?'en-GB':'sr-Latn-ME',
+    {maximumFractionDigits:2}).format(n);
+  return <section className="card stack results-summary">
+   <button type="button" className="summary-toggle" aria-expanded={resultSummaryOpen}
+    onClick={()=>setResultSummaryOpen(x=>!x)}>
+    <span className="summary-title"><span className="results-symbol">↗</span><span>
+     <strong>{copy('Мои результаты','My results','Moji rezultati',lang)}</strong>
+     <small className="muted">{copy('Прогресс с первого отчёта','Progress since your first report','Napredak od prvog izvještaja',lang)}</small>
+    </span></span>
+    <span aria-hidden="true">{resultSummaryOpen?'⌃':'⌄'}</span>
+   </button>
+   {resultSummaryOpen&&<div className="results-expanded">
+    {!first||!latest?<p className="small muted">{copy('Добавьте первый замер, чтобы отслеживать прогресс.','Add your first measurements to track progress.','Dodajte prva mjerenja kako biste pratili napredak.',lang)}</p>
+    :<>
+      <div className="result-date-grid">
+       <div><small className="muted">{copy('Первый отчёт','First report','Prvi izvještaj',lang)}</small><strong>{first.measuredOn}</strong></div>
+       <div><small className="muted">{copy('Последний отчёт','Latest report','Posljednji izvještaj',lang)}</small><strong>{latest.measuredOn}</strong></div>
+      </div>
+      <div className="result-compare-head"><b>{copy('Показатель','Metric','Parametar',lang)}</b><b>{copy('Было','Before','Bilo',lang)}</b><b>{copy('Стало','Now','Sada',lang)}</b><b>{copy('Изменение','Change','Promjena',lang)}</b></div>
+      {measureFields.map(field=>{
+       const before=first[field.key],after=latest[field.key];
+       const delta=canCompare?changes[field.key]:null;
+       return <div key={field.key} className="result-compare-row">
+        <span>{field.label[labels]}</span>
+        <span>{typeof before==='number'?fmt(before):'—'}</span>
+        <span>{typeof after==='number'?fmt(after):'—'}</span>
+        <strong>{typeof delta==='number'?`${delta>0?'+':delta<0?'−':''}${fmt(Math.abs(delta))} ${field.unit}`:'—'}</strong>
+       </div>;
+      })}
+      {!canCompare&&<p className="small muted">{copy('Для расчёта изменений нужен второй отчёт.','A second report is needed to calculate changes.','Za prikaz promjena potreban je još jedan izvještaj.',lang)}</p>}
+      <p className="small muted">{copy('Изменение = последний замер − первый. Положительное или отрицательное значение не означает оценку результата.','Change = latest minus first. Positive or negative is not a fitness judgment.','Promjena = posljednje mjerenje minus prvo. Predznak nije ocjena napretka.',lang)}</p>
+     </>
+    }
+   </div>}
+  </section>;
+ };
  const measurementPanel=(id:string)=>{
   const rows=bodyMeasurements[measurementKey(id)]||[];
   const total=bodyCounts[measurementKey(id)]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
@@ -532,7 +577,7 @@ export default function Fat2Fit(){
  function workoutView(){if(!shownAssignment)return <div className="view stack">{header(t('today',lang),t('workout',lang))}<div className="card empty">{t('noAssignments',lang)}</div></div>;
  const a=shownAssignment;return <div className="view stack">{mode==='coach'&&back('studentDetail')}{header(mode==='coach'?copy('Совместная тренировка','Coach-assisted workout','Trening sa trenerom',lang):isoDate(a.date,lang),templateTitle(a))}<div className="spread"><span className="small muted">{t('sets',lang)}</span><b>{doneSets(a)}/{totalSets(a)}</b></div><ProgressBar value={percent(doneSets(a),totalSets(a))}/>{a.items.map((item,n)=><div key={item.id} className="exercise stack"><div className="row"><span className="ex-number">{n+1}</span><span className="grow"><b>{exerciseName(item.exerciseId)}</b><span className="small muted" style={{display:'block'}}>{item.sets} × {item.reps} · {item.weight} kg · {item.rest}s</span></span><button type="button" className="link-button" onClick={()=>{setExerciseId(item.exerciseId);setReturnScreen(mode==='coach'?'coachWorkout':'workout');selectScreen('exerciseDetail');}}>ⓘ</button></div><div className="set-row small muted" style={{marginTop:12}}><span>№</span><span style={{textAlign:'center'}}>{t('reps',lang)}</span><span style={{textAlign:'center'}}>{t('weight',lang)}</span><span>✓</span></div>{Array.from({length:item.sets},(_,i)=>{const log=item.logs.find(l=>l.setIndex===i);const key=`${item.id}-${i}`;const values=workoutDraft[key]||{reps:log?.reps??item.reps,weight:log?.weight??item.weight};return <div className="set-row" key={i}><b className="small">{i+1}</b><input aria-label={`${t('reps',lang)} ${i+1}`} type="number" inputMode="numeric" min="0" max="1000" value={values.reps} onChange={e=>setWorkoutDraft(d=>({...d,[key]:{...values,reps:num(e.target.value)}}))}/><input aria-label={`${t('weight',lang)} ${i+1}`} type="number" inputMode="decimal" min="0" max="9999" step="0.5" value={values.weight} onChange={e=>setWorkoutDraft(d=>({...d,[key]:{...values,weight:num(e.target.value)}}))}/><button className={log?.done?'checked':''} type="button" disabled={busy} aria-pressed={Boolean(log?.done)} aria-label={`Set ${i+1}: ${log?.done?'done':'not done'}`} onClick={()=>void toggleSet(a,item,i)}>{log?.done?'✓':'○'}</button></div>;})}{mode==='student'&&videoPicker(a,item)}{(videosByAssignment[a.id]||[]).some(v=>v.itemId===item.id)&&videoReview(a,mode==='coach',item.id)}</div>)}<div className="card stack"><label className="field">{mode==='coach'?copy('Комментарий тренера','Coach note','Napomena trenera',lang):t('comment',lang)}<textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={2000}/></label><label className="field">RPE · {effort}/10<input type="range" min="1" max="10" value={effort} onChange={e=>setEffort(Number(e.target.value))}/></label><button className="btn primary full" disabled={!doneSets(a)||busy} onClick={()=>void finishWorkout(a)}>{t('finish',lang)}</button></div></div>;
  }
- function historyView(){const completed=myAssignments.filter(a=>a.status==='completed');return <div className="view stack">{header(copy('РЕЗУЛЬТАТЫ','YOUR RESULTS','REZULTATI',lang),t('history',lang))}{measurementPanel(studentId)}{historyAccess==='summary'&&!canCoach?<section className="card stack"><h2 className="section-title">{copy('Завершённые тренировки по типам','Completed workouts by category','Završeni treninzi po vrsti',lang)}</h2><div className="history-summary">{trainingTypes.map(type=><div key={type}><strong>{workoutSummary[type]}</strong><span>{trainingLabel(type,lang)}</span></div>)}</div><p className="small muted">{copy('Подробная история тренировок скрыта настройками тренера.','Detailed workout history is hidden by your coach.','Detaljnu istoriju je sakrio trener.',lang)}</p></section>:completed.map(a=><div key={a.id} className="card stack"><div className="spread"><b>{templateTitle(a)}</b>{statusLabel(a)}</div><div className="small muted">{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()} · RPE {a.effort}/10</div>{a.items.map(i=><div className="spread small" key={i.id}><span>{exerciseName(i.exerciseId)}</span><b>{i.logs.filter(l=>l.done).length}/{i.sets}</b></div>)}{a.note&&<p className="detail-paragraph">{a.note}</p>}{a.items.map(item=><div key={`upload-${item.id}`}>{videoPicker(a,item)}</div>)}<button type="button" className="btn full" onClick={()=>void loadVideos(a.id).catch(fail)}>{copy('Показать проверки','View feedback','Prikaži pregled',lang)}</button>{(videosByAssignment[a.id]||[]).length>0&&videoReview(a,false)}</div>)}{historyAccess==='full'&& !completed.length&&<div className="card empty">{t('noResults',lang)}</div>}</div>;
+ function historyView(){const completed=myAssignments.filter(a=>a.status==='completed');return <div className="view stack">{header(copy('РЕЗУЛЬТАТЫ','YOUR RESULTS','REZULTATI',lang),t('history',lang))}{measurementProgress(studentId)}{measurementPanel(studentId)}{historyAccess==='summary'&&!canCoach?<section className="card stack"><h2 className="section-title">{copy('Завершённые тренировки по типам','Completed workouts by category','Završeni treninzi po vrsti',lang)}</h2><div className="history-summary">{trainingTypes.map(type=><div key={type}><strong>{workoutSummary[type]}</strong><span>{trainingLabel(type,lang)}</span></div>)}</div><p className="small muted">{copy('Подробная история тренировок скрыта настройками тренера.','Detailed workout history is hidden by your coach.','Detaljnu istoriju je sakrio trener.',lang)}</p></section>:completed.map(a=><div key={a.id} className="card stack"><div className="spread"><b>{templateTitle(a)}</b>{statusLabel(a)}</div><div className="small muted">{isoDate(a.date,lang)} · {doneSets(a)}/{totalSets(a)} {t('sets',lang).toLowerCase()} · RPE {a.effort}/10</div>{a.items.map(i=><div className="spread small" key={i.id}><span>{exerciseName(i.exerciseId)}</span><b>{i.logs.filter(l=>l.done).length}/{i.sets}</b></div>)}{a.note&&<p className="detail-paragraph">{a.note}</p>}{a.items.map(item=><div key={`upload-${item.id}`}>{videoPicker(a,item)}</div>)}<button type="button" className="btn full" onClick={()=>void loadVideos(a.id).catch(fail)}>{copy('Показать проверки','View feedback','Prikaži pregled',lang)}</button>{(videosByAssignment[a.id]||[]).length>0&&videoReview(a,false)}</div>)}{historyAccess==='full'&& !completed.length&&<div className="card empty">{t('noResults',lang)}</div>}</div>;
  }
  if(!ready)return <div id="phone"><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view"><div className="card">{copy('Загрузка…','Loading…','Učitavanje…',lang)}</div></main></div>;
  if(!DEMO&&!workspaceId)return <div id="phone"><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view stack"><div className="card stack">
