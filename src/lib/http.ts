@@ -7,8 +7,11 @@ export function jsonError(e:unknown){if(e instanceof ApiError)return NextRespons
 export async function requireUser(){const userId=await currentUserId();if(!userId)throw new ApiError(401,'Login through Telegram');return userId;}
 export async function requireWorkspace(workspaceId:string,allowed:Role[]=['coach','student']){
  const userId=await requireUser();if(!isUuid(workspaceId))throw new ApiError(400,'Invalid workspace');
- const m=await query<{role:Role}>('select role from memberships where workspace_id=$1 and user_id=$2',[workspaceId,userId]);
- if(!m.rows[0]||!allowed.includes(m.rows[0].role))throw new ApiError(403,'Workspace access denied');
+ const m=await query<{role:Role;owner_user_id:string}>(`select m.role,w.owner_user_id from memberships m
+ join workspaces w on w.id=m.workspace_id where m.workspace_id=$1 and m.user_id=$2`,[workspaceId,userId]);
+ if(!m.rows[0]||!allowed.includes(m.rows[0].role)||
+  (m.rows[0].role==='coach'&&m.rows[0].owner_user_id!==userId))
+  throw new ApiError(403,'Workspace access denied');
  return {userId,role:m.rows[0].role};
 }
 export function isUuid(x:unknown):x is string{return typeof x==='string' && /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(x);}
