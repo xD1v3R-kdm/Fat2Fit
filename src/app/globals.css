@@ -216,3 +216,21 @@ input,textarea,select {max-width:100%}
 #phone .result-compare-row span:not(:first-child){text-align:right}
 #phone .result-compare-row strong{text-align:right;font-size:11px;color:#192c49}
 @media(max-width:350px){#phone .coach-kpi span{font-size:10px}#phone .result-compare-head,#phone .result-compare-row{gap:3px;font-size:10px}}
+
+
+/* Fat2Fit 0.8.1 — compact coach overview without hiding any of the four KPIs. */
+#phone .hero.coach-control{padding:14px 15px 15px;gap:9px}
+#phone .hero.coach-control .eyebrow{font-size:10px;letter-spacing:.7px;margin-bottom:0}
+#phone .hero.coach-control h2{font-size:20px;line-height:1.16;letter-spacing:-.5px}
+#phone .coach-control .coach-kpi-grid{gap:7px}
+#phone .coach-control .coach-kpi{min-height:70px;padding:9px 10px;gap:3px;border-radius:12px}
+#phone .coach-control .coach-kpi strong{font-size:23px;line-height:1}
+#phone .coach-control .coach-kpi span{font-size:10.5px;line-height:1.27}
+#phone .coach-control .coach-reminder-box{padding-top:8px}
+#phone .coach-control .coach-reminder-trigger{min-height:34px}
+#phone .new-workout-action{min-height:52px;font-weight:800}
+@media(max-width:350px){
+ #phone .hero.coach-control{padding:12px;gap:8px}
+ #phone .coach-control .coach-kpi{padding:8px;min-height:70px}
+ #phone .coach-control .coach-kpi span{font-size:10px}
+}
