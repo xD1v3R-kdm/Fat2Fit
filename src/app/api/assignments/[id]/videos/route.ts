@@ -5,7 +5,7 @@ import {ApiError,isUuid,requireUser,jsonError,parseText} from '@/lib/http';
 import {VIDEO_BUCKET,MAX_VIDEO_BYTES,signedPlaybackUrl,signedUploadUrl,validateVideoFile} from '@/lib/videos';
 
 async function permission(id:string,userId:string){
- const result=await query<{workspace_id:string;student_user_id:string;role:string;status:string;history_visibility:string}>(`select a.workspace_id,a.student_user_id,m.role,a.status,m.history_visibility from assignments a join memberships m on m.workspace_id=a.workspace_id and m.user_id=$2 where a.id=$1 and (m.role='coach' or (m.role='student' and a.student_user_id=$2))`,[id,userId]);
+ const result=await query<{workspace_id:string;student_user_id:string;role:string;status:string;history_visibility:string}>(`select a.workspace_id,a.student_user_id,m.role,a.status,m.history_visibility from assignments a join memberships m on m.workspace_id=a.workspace_id and m.user_id=$2 where a.id=$1 and ((m.role='coach' and exists(select 1 from workspaces w where w.id=a.workspace_id and w.owner_user_id=$2)) or (m.role='student' and a.student_user_id=$2))`,[id,userId]);
  if(!result.rows[0])throw new ApiError(403,'Workout access denied');
  if(result.rows[0].role==='student'&&result.rows[0].history_visibility==='summary'&&
  ['completed','skipped'].includes(result.rows[0].status))throw new ApiError(403,'Workout history is restricted');
