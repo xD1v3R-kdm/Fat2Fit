@@ -43,7 +43,7 @@ export async function POST(request:Request){
    return {exerciseId:x.exerciseId,position,sets,reps,weight,rest};
   }):[];
   const id=await transaction(async c=>{
-   const sm=await c.query("select 1 from memberships where workspace_id=$1 and user_id=$2 and (role='student' or (role='coach' and user_id=$3))",[ws,studentId,userId]);
+   const sm=await c.query("select 1 from memberships where workspace_id=$1 and user_id=$2 and (role='student' or (role='coach' and user_id=$3 and exists(select 1 from workspaces where id=$1 and owner_user_id=$3)))",[ws,studentId,userId]);
    if(!sm.rowCount)throw new ApiError(403,'Student not in workspace');
    let finalItems:{exerciseId:string;position:number;sets:number;reps:number;weight:number;rest:number}[];
    let finalTitle:Record<string,string>,workoutType:string,templateId:string|null=null;
