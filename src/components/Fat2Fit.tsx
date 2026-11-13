@@ -150,18 +150,20 @@ export default function Fat2Fit(){
     await api('/auth/telegram','POST',{initData:tg.initData});
     const q=new URLSearchParams(window.location.search);
     const start=tg.initDataUnsafe?.start_param||q.get('invite')||'';
+    let newWorkspaceId='';
     if(start.startsWith('invite_')||q.get('invite')){
       const token=start.startsWith('invite_')?start.slice(7):start;
-      try{await api('/invitations/redeem','POST',{token});}catch(e){if(alive)fail(e);}
+      try{const redeemed=await api<{workspaceId:string}>('/invitations/redeem','POST',{token});newWorkspaceId=redeemed.workspaceId;}catch(e){if(alive)fail(e);}
     }
     const identity=await api<Me>('/me');if(!alive)return;
     setMe(identity);if(!stored||!isLang(stored))setLang(identity.language);
-    const membership=identity.memberships.find(m=>m.role==='coach')||identity.memberships[0];
-    if(membership){setWorkspaceId(membership.workspaceId);setMode(membership.role);setStudentId(identity.id);setHistoryAccess(membership.historyVisibility||'full');await loadLive(membership.workspaceId,membership.role);await loadSummary(membership.workspaceId,identity.id);}
+    const membership=identity.memberships.find(m=>m.workspaceId===newWorkspaceId)
+      ||identity.memberships.find(m=>m.role==='coach')||identity.memberships[0];
+    if(membership){setWorkspaceId(membership.workspaceId);setMode(membership.role);setStudentId(identity.id);setHistoryAccess(membership.historyVisibility||'full');await loadLive(membership.workspaceId,membership.role);await loadSummary(membership.workspaceId,identity.id);if(membership.role==='coach')await loadCoachDashboard(membership.workspaceId);}
     if(alive)setReady(true);
    }catch(e){if(alive){fail(e);setReady(true);}}
   };void init();return ()=>{alive=false;};
- },[loadLive,loadSummary]);
+ },[loadLive,loadSummary,loadCoachDashboard]);
  useEffect(()=>{if(!ready)return;try{localStorage.setItem('fat2fit-03-lang',lang);if(DEMO)localStorage.setItem('fat2fit-03-demo',JSON.stringify(data));}catch{}},[data,lang,ready]);
  const refresh=async()=>{if(!DEMO&&workspaceId){await loadLive(workspaceId,mode);if(mode==='student')await loadSummary(workspaceId,studentId);else await loadCoachDashboard(workspaceId);}};
  useEffect(()=>{
