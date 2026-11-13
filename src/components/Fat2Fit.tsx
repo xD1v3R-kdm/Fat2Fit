@@ -9,6 +9,9 @@ import {videoExtension} from '@/lib/video-rules';
 type Screen='dashboard'|'students'|'studentDetail'|'coachWorkout'|'exercises'|'exerciseDetail'|'exerciseNew'|'templates'|'templateNew'|'assign'|'reports'|'reportDetail'|'workout'|'history';
 type WorkoutVideo={id:string;itemId:string;setIndex:number|null;status:'uploading'|'pending'|'approved'|'changes_requested';reviewNote:string;createdAt:string;studentId:string;url:string};
 type BodyMeasurement={id:string;measuredOn:string;weightKg:number|null;muscleMassKg:number|null;waistCm:number|null;chestCm:number|null;bicepsCm:number|null;thighCm:number|null;hipsCm:number|null;note:string;updatedAt:string};
+type DashboardFilter='all'|'today'|'tomorrow'|'workouts'|'videos';
+type MeasurementReminder={studentId:string;studentName:string;dueOn:string;status:'pending'|'sent'};
+type CoachDashboard={today:number;tomorrow:number;workoutsPending:number;videosPending:number;reminders:MeasurementReminder[]};
 type MeasureKey='weightKg'|'muscleMassKg'|'waistCm'|'chestCm'|'bicepsCm'|'thighCm'|'hipsCm';
 const measureFields:{key:MeasureKey;label:[string,string,string];unit:string;min:number;max:number}[]=[
  {key:'weightKg',label:['Вес','Weight','Težina'],unit:'kg',min:10,max:500},
@@ -61,7 +64,13 @@ export default function Fat2Fit(){
  const [manualItems,setManualItems]=useState<WorkoutItem[]>([]);
  const [inviteLink,setInviteLink]=useState(''),[workoutDraft,setWorkoutDraft]=useState<Record<string,{reps:number;weight:number}>>({}),[note,setNote]=useState(''),[effort,setEffort]=useState(6);
  const [bodyMeasurements,setBodyMeasurements]=useState<Record<string,BodyMeasurement[]>>({});
+ const [bodyFirst,setBodyFirst]=useState<Record<string,BodyMeasurement|null>>({});
  const [bodyCounts,setBodyCounts]=useState<Record<string,number>>({});
+ const [resultSummaryOpen,setResultSummaryOpen]=useState(false);
+ const [coachDashboard,setCoachDashboard]=useState<CoachDashboard|null>(null);
+ const [remindersOpen,setRemindersOpen]=useState(false);
+ const [requestBusy,setRequestBusy]=useState(false);
+ const [reportFilter,setReportFilter]=useState<DashboardFilter>('all');
  const [measureDate,setMeasureDate]=useState(dateShift());
  const [measureDraft,setMeasureDraft]=useState<Partial<Record<MeasureKey,string>>>({});
  const [measureNote,setMeasureNote]=useState('');
@@ -74,7 +83,43 @@ export default function Fat2Fit(){
  const [workoutSummary,setWorkoutSummary]=useState({strength:0,circuit:0,cardio:0,total:0});
  const [historyBusy,setHistoryBusy]=useState(false);
  const notify=(message:string)=>{setToast(message);setTimeout(()=>setToast(''),4200);};
+ const measurementKey=(id:string,ws=workspaceId)=>`${ws}:${id}`;
+ const loadCoachDashboard=useCallback(async(ws:string)=>{
+  if(DEMO)return;
+  const dashboard=await api<CoachDashboard>(`/coach-dashboard?workspaceId=${encodeURIComponent(ws)}&date=${dateShift()}`);
+  setCoachDashboard(dashboard);
+ },[]);
+ const openDashboardList=(filter:DashboardFilter)=>{setReportFilter(filter);selectScreen('reports');};
+ const requestMeasurements=async(reminder:MeasurementReminder,action:'send'|'skip')=>{
+  if(requestBusy||!workspaceId)return;
+  if(action==='skip'&&!window.confirm(copy('Пропустить этот ежемесячный отчёт?','Skip this monthly report?','Preskočiti ovaj mjesečni izvještaj?',lang)))return;
+  setRequestBusy(true);setError('');
+  try{
+   await api('/measurement-requests','POST',{workspaceId,studentId:reminder.studentId,dueOn:reminder.dueOn,action});
+   await loadCoachDashboard(workspaceId);
+   notify(action==='send'?copy('Запрос отправлен ученику','Request sent to student','Zahtjev je poslat učeniku',lang):copy('Запрос пропущен','Request skipped','Zahtjev je preskočen',lang));
+  }catch(e){fail(e);}finally{setRequestBusy(false);}
+ };
+ const reviewWorkout=async(a:Assignment,status:'approved'|'changes_requested')=>{
+  if(busy)return;
+  setBusy(true);setError('');
+  try{
+   await api(`/assignments/${a.id}/review`,'PATCH',{status,note:reviewNotes['workout-'+a.id]||''});
+   await refresh();await loadCoachDashboard(workspaceId);
+   notify(copy('Проверка тренировки сохранена','Workout review saved','Pregled treninga je sačuvan',lang));
+  }catch(e){fail(e);}finally{setBusy(false);}
+ };
  const fail=(e:unknown)=>setError(e instanceof Error?e.message:String(e));
+ useEffect(()=>{
+   if(!ready||DEMO||!workspaceId||mode!=='coach'||screen!=='dashboard')return;
+   void loadCoachDashboard(workspaceId).catch(fail);
+ },[ready,workspaceId,mode,screen,loadCoachDashboard]);
+ useEffect(()=>{
+   if(DEMO||!ready)return;
+   const onForeground=()=>{if(!document.hidden&&workspaceId&&mode==='coach')void loadCoachDashboard(workspaceId).catch(fail);};
+   document.addEventListener('visibilitychange',onForeground);
+   return ()=>document.removeEventListener('visibilitychange',onForeground);
+ },[ready,workspaceId,mode,loadCoachDashboard]);
  const loadSummary=useCallback(async(ws:string,id:string)=>{
   const response=await api<{counts:{strength:number;circuit:number;cardio:number};total:number;historyVisibility:'full'|'summary'}>(`/workout-summary?workspaceId=${encodeURIComponent(ws)}&studentId=${encodeURIComponent(id)}`);
   setWorkoutSummary({...response.counts,total:response.total});
@@ -118,7 +163,7 @@ export default function Fat2Fit(){
   };void init();return ()=>{alive=false;};
  },[loadLive,loadSummary]);
  useEffect(()=>{if(!ready)return;try{localStorage.setItem('fat2fit-03-lang',lang);if(DEMO)localStorage.setItem('fat2fit-03-demo',JSON.stringify(data));}catch{}},[data,lang,ready]);
- const refresh=async()=>{if(!DEMO&&workspaceId){await loadLive(workspaceId,mode);if(mode==='student')await loadSummary(workspaceId,studentId);}};
+ const refresh=async()=>{if(!DEMO&&workspaceId){await loadLive(workspaceId,mode);if(mode==='student')await loadSummary(workspaceId,studentId);else await loadCoachDashboard(workspaceId);}};
  useEffect(()=>{
    if(DEMO||!workspaceId||!['workout','coachWorkout'].includes(screen))return;
    let fetching=false;
@@ -127,6 +172,16 @@ export default function Fat2Fit(){
  },[screen,workspaceId,mode,loadLive]);
 
  const changeLanguage=(l:Language)=>{setLang(l);if(!DEMO)void api('/me','PATCH',{language:l}).catch(fail);};
+ const chooseWorkspace=(ws:string)=>{
+  const member=me?.memberships.find(m=>m.workspaceId===ws);
+  if(!member)return;
+  setWorkspaceId(ws);setMode(member.role);setCoachDashboard(null);
+  setInviteLink('');setReportId('');setSelectedStudent('');setReportFilter('all');
+  setResultSummaryOpen(false);selectScreen('dashboard');
+  void loadLive(ws,member.role).then(()=>loadSummary(ws,studentId)).then(()=>{
+   if(member.role==='coach')return loadCoachDashboard(ws);
+  }).catch(fail);
+ };
  const selectScreen=(s:Screen)=>{setScreen(s);setError('');setSearch('');setGroup('all');};
  const canCoach=DEMO||Boolean(me?.memberships.some(m=>m.workspaceId===workspaceId&&m.role==='coach'));
  const switchMode=(role:Role)=>{
