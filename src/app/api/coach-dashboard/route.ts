@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import {query} from '@/lib/db';
 import {ApiError,requireWorkspace,jsonError} from '@/lib/http';
-import {reportingPeriods} from '@/lib/report-schedule';
+import {reportingWindows} from '@/lib/report-schedule';
 
 type Member={id:string;name:string;telegramId:string;joinedOn:string};
 type Reminder={studentId:string;studentName:string;dueOn:string;status:'pending'|'sent'};
@@ -31,23 +31,23 @@ export async function GET(request:Request){
   // Materialize each calendar-month reminder idempotently on trainer dashboard open.
   // Students who already submitted measurements during the cycle are not nagged.
   for(const member of members.rows){
-   const periods=reportingPeriods(member.joinedOn,date);
+   const periods=reportingWindows(member.joinedOn,date);
    if(!periods.length)continue;
    await query(`insert into measurement_requests
       (workspace_id,student_user_id,due_on,status,completed_measurement_id,completed_at)
       select $1,$2,cycle.due_on,
         case when bm.id is null then 'pending' else 'completed' end,
         bm.id,case when bm.id is null then null else now() end
-      from unnest($3::date[],$4::date[]) cycle(due_on,period_start)
+      from unnest($3::date[],$4::date[],$5::date[]) cycle(due_on,start_on,end_on)
       left join lateral (
        select id from body_measurements
        where workspace_id=$1 and student_user_id=$2
-         and measured_on>cycle.period_start
-         and measured_on<=cycle.due_on
+         and measured_on>=cycle.start_on
+         and measured_on<cycle.end_on
        order by measured_on desc,created_at desc limit 1
       ) bm on true
       on conflict(workspace_id,student_user_id,due_on) do nothing`,
-    [ws,member.id,periods.map(x=>x.dueOn),periods.map(x=>x.periodStart)]);
+    [ws,member.id,periods.map(x=>x.dueOn),periods.map(x=>x.reportStartInclusive),periods.map(x=>x.reportEndExclusive)]);
   }
   const reminders=await query<Reminder>(`select r.student_user_id as "studentId",
     u.display_name as "studentName",r.due_on::text as "dueOn",r.status
