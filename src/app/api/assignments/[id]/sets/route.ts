@@ -9,7 +9,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
  await transaction(async c=>{
  const r=await c.query<{planned_sets:number;status:string}>(`select ae.planned_sets,a.status from assignment_exercises ae join assignments a on a.id=ae.assignment_id
  join memberships m on m.workspace_id=a.workspace_id and m.user_id=$3
- where ae.id=$1 and ae.assignment_id=$2 and (m.role='coach' or (m.role='student' and a.student_user_id=$3)) for update of a`,[b.itemId,id,userId]);
+ where ae.id=$1 and ae.assignment_id=$2 and ((m.role='coach' and exists(select 1 from workspaces w where w.id=a.workspace_id and w.owner_user_id=$3)) or (m.role='student' and a.student_user_id=$3)) for update of a`,[b.itemId,id,userId]);
  if(!r.rows[0])throw new ApiError(403,'Assignment not available');
  if(['completed','skipped'].includes(r.rows[0].status))throw new ApiError(409,'Workout is closed');
  if(setIndex>=r.rows[0].planned_sets)throw new ApiError(400,'Set index out of bounds');
