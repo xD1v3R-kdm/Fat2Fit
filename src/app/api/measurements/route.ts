@@ -1,6 +1,7 @@
 import {NextResponse} from 'next/server';
 import {query} from '@/lib/db';
 import {ApiError,isUuid,requireWorkspace,jsonError} from '@/lib/http';
+import {reportingWindows} from '@/lib/report-schedule';
 
 const bounds = {
  weightKg:[10,500], muscleMassKg:[1,300], waistCm:[20,300], chestCm:[20,300],
@@ -85,15 +86,20 @@ export async function POST(request:Request){
      note=excluded.note,recorded_by=excluded.recorded_by,updated_at=now()
     returning id
   `,[workspaceId,studentId,measuredOn,values.weightKg,values.muscleMassKg,values.waistCm,values.chestCm,values.bicepsCm,values.thighCm,values.hipsCm,note,userId]);
-  // One saved report resolves at most one open monthly request for this coach.
-  await query(`update measurement_requests set status='completed',completed_at=now(),
-   completed_measurement_id=$4
-   where workspace_id=$1 and student_user_id=$2 and due_on=(
-    select max(due_on) from measurement_requests
-    where workspace_id=$1 and student_user_id=$2 and due_on<=$3::date
-      and status in ('pending','sent'))
-   and status in ('pending','sent')`,
-   [workspaceId,studentId,measuredOn,r.rows[0].id]);
+  // Match a submitted report to exactly one coach-specific calendar month.
+  // An early January report cannot accidentally clear an overdue December request.
+  const membership=await query<{joinedOn:string}>(`select
+   (created_at at time zone 'Europe/Podgorica')::date::text as "joinedOn"
+   from memberships where workspace_id=$1 and user_id=$2`,[workspaceId,studentId]);
+  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Podgorica',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  if(membership.rows[0]){
+   const period=reportingWindows(membership.rows[0].joinedOn,today)
+     .find(w=>measuredOn>=w.reportStartInclusive&&measuredOn<w.reportEndExclusive);
+   if(period)await query(`update measurement_requests set status='completed',completed_at=now(),
+     completed_measurement_id=$4
+     where workspace_id=$1 and student_user_id=$2 and due_on=$3::date
+     and status in ('pending','sent')`,[workspaceId,studentId,period.dueOn,r.rows[0].id]);
+  }
   return NextResponse.json({ok:true,id:r.rows[0].id},{status:201});
  }catch(e){return jsonError(e);}
 }
