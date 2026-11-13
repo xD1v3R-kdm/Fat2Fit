@@ -19,6 +19,10 @@ export async function POST(request:Request){
    if(!r.rowCount)throw new ApiError(409,'Report request not open');
    return NextResponse.json({ok:true,status:'skipped'});
   }
+  const token=process.env.TELEGRAM_BOT_TOKEN;
+  const bot=process.env.TELEGRAM_BOT_USERNAME;
+  const app=process.env.TELEGRAM_MINI_APP_SHORT_NAME;
+  if(!token||!bot||!app)throw new ApiError(503,'Telegram bot configuration missing');
   // Claim atomically to prevent duplicate Telegram messages from rapid taps.
   const claimed=await query<{telegramId:string;name:string}>(`update measurement_requests r
    set status='sending' from users u
@@ -27,10 +31,6 @@ export async function POST(request:Request){
    returning u.telegram_id::text as "telegramId",u.display_name as name`,
    [ws,studentId,dueOn]);
   if(!claimed.rows.length)throw new ApiError(409,'Report request already sent or closed');
-  const token=process.env.TELEGRAM_BOT_TOKEN;
-  const bot=process.env.TELEGRAM_BOT_USERNAME;
-  const app=process.env.TELEGRAM_MINI_APP_SHORT_NAME;
-  if(!token||!bot||!app)throw new ApiError(503,'Telegram bot configuration missing');
   const url=`https://t.me/${encodeURIComponent(bot)}/${encodeURIComponent(app)}`;
   try{
    const message=`Fat2Fit 💪\nТренер просит отправить ежемесячный отчёт по замерам тела.\nСрок отчёта: ${dueOn}.\nОткройте «История → Замеры» и сохраните вес, объёмы и другие результаты.\n${url}`;
