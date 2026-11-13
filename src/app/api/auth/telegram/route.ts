@@ -18,7 +18,7 @@ export async function POST(request:Request){
     await c.query('select pg_advisory_xact_lock(hashtext($1))',[userId]);
     const existing=await c.query('select 1 from memberships where user_id=$1 and role=$2 limit 1',[userId,'coach']);
     if(!existing.rowCount){
-     const w=await c.query<{id:string}>('insert into workspaces(name) values($1) returning id',[`${name} · Fat2Fit`]);
+     const w=await c.query<{id:string}>('insert into workspaces(name,owner_user_id) values($1,$2) returning id',[`${name} · Fat2Fit`,userId]);
      await c.query('insert into memberships(workspace_id,user_id,role) values($1,$2,$3)',[w.rows[0].id,userId,'coach']);
     }
    });
