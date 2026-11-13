@@ -286,9 +286,11 @@ export default function Fat2Fit(){
   }
  };
  const loadBody=useCallback(async(id:string,ws:string)=>{
-  const response=await api<{measurements:BodyMeasurement[];completedWorkouts:number}>(`/measurements?workspaceId=${encodeURIComponent(ws)}&studentId=${encodeURIComponent(id)}`);
-  setBodyMeasurements(old=>({...old,[id]:response.measurements}));
-  setBodyCounts(old=>({...old,[id]:response.completedWorkouts}));
+  const response=await api<{measurements:BodyMeasurement[];firstMeasurement:BodyMeasurement|null;completedWorkouts:number}>(`/measurements?workspaceId=${encodeURIComponent(ws)}&studentId=${encodeURIComponent(id)}`);
+  const key=`${ws}:${id}`;
+  setBodyMeasurements(old=>({...old,[key]:response.measurements}));
+  setBodyFirst(old=>({...old,[key]:response.firstMeasurement}));
+  setBodyCounts(old=>({...old,[key]:response.completedWorkouts}));
  },[]);
  useEffect(()=>{
   if(!ready||DEMO||!workspaceId)return;
@@ -316,7 +318,10 @@ export default function Fat2Fit(){
    if(DEMO){
     const row:BodyMeasurement={id:uid(),measuredOn:measureDate,weightKg:null,muscleMassKg:null,waistCm:null,chestCm:null,bicepsCm:null,thighCm:null,hipsCm:null,note:measureNote.trim(),updatedAt:new Date().toISOString()};
     for(const key of measureFields.map(x=>x.key)) if(typeof payload[key]==='number')row[key]=payload[key] as number;
-    setBodyMeasurements(old=>({...old,[id]:[row,...(old[id]||[]).filter(x=>x.measuredOn!==measureDate)].sort((a,b)=>b.measuredOn.localeCompare(a.measuredOn))}));
+    const key=measurementKey(id);
+    const updated=[row,...(bodyMeasurements[key]||[]).filter(x=>x.measuredOn!==measureDate)].sort((a,b)=>b.measuredOn.localeCompare(a.measuredOn));
+    setBodyMeasurements(old=>({...old,[key]:updated}));
+    setBodyFirst(old=>({...old,[key]:updated[updated.length-1]||null}));
    }else{
     await api('/measurements','POST',payload);
     await loadBody(id,workspaceId);
@@ -327,10 +332,10 @@ export default function Fat2Fit(){
  };
  const formatBody=(m:BodyMeasurement)=>measureFields.filter(f=>m[f.key]!=null).map(f=>`${f.label[lang==='ru'?0:lang==='en'?1:2]}: ${m[f.key]} ${f.unit}`).join('\n');
  const shareBody=async(id:string)=>{
-  const rows=bodyMeasurements[id]||[];
+  const rows=bodyMeasurements[measurementKey(id)]||[];
   const latest=rows[0];
   const title=mode==='coach'?data.students.find(s=>s.id===id)?.name||'Fat2Fit':me?.name||'Fat2Fit';
-  const completed=bodyCounts[id]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
+  const completed=bodyCounts[measurementKey(id)]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
   const report=`Fat2Fit — ${title}\n${copy('Завершено тренировок','Completed workouts','Završeni treninzi',lang)}: ${completed}${latest?'\n'+latest.measuredOn+'\n'+formatBody(latest):''}`;
   if(navigator.share){
    try{await navigator.share({text:report,title:'Fat2Fit'});return;}
@@ -339,8 +344,8 @@ export default function Fat2Fit(){
   await clipboardCopy(report);
  };
  const measurementPanel=(id:string)=>{
-  const rows=bodyMeasurements[id]||[];
-  const total=bodyCounts[id]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
+  const rows=bodyMeasurements[measurementKey(id)]||[];
+  const total=bodyCounts[measurementKey(id)]??data.assignments.filter(a=>a.studentId===id&&a.status==='completed').length;
   const fieldLabel=(f:typeof measureFields[number])=>f.label[lang==='ru'?0:lang==='en'?1:2];
   return <section className="card stack measurements">
    <div className="spread"><h2 className="section-title">{copy('Замеры и прогресс','Measurements & progress','Merenja i napredak',lang)}</h2><span className="badge blue">{total} {copy('тренировок','workouts','treninga',lang)}</span></div>
