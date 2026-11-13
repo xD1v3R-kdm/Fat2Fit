@@ -21,13 +21,13 @@ export function reportingPeriods(joined:string,today:string,maxMonths=120){
  }
  return result;
 }
-export function compareMeasurements(
- first:Record<string,number|null|undefined>,
- latest:Record<string,number|null|undefined>,
- fields:readonly string[]
+export function compareMeasurements<T extends object>(
+ first:T,
+ latest:T,
+ fields:readonly (keyof T & string)[]
 ):Record<string,number|null>{
  return Object.fromEntries(fields.map(field=>{
-  const left=first[field],right=latest[field];
+  const left=first[field] as unknown,right=latest[field] as unknown;
   const delta=typeof left==='number'&&Number.isFinite(left)&&typeof right==='number'&&Number.isFinite(right)
    ?Math.round((right-left)*100)/100:null;
   return [field,delta];
