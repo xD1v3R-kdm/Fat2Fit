@@ -21,6 +21,22 @@ export function reportingPeriods(joined:string,today:string,maxMonths=120){
  }
  return result;
 }
+// A non-overlapping report window centered around the month's due date.
+// A report filed slightly late (e.g. Dec 15 for Dec 13) still counts for
+// December, not January. Windows cannot count one report for two months.
+export function reportingWindows(joined:string,today:string){
+ const periods=reportingPeriods(joined,today);
+ const midpoint=(left:string,right:string)=>{
+  const a=Date.parse(left+'T00:00:00Z'),b=Date.parse(right+'T00:00:00Z');
+  return new Date(Math.floor((a+b)/2)).toISOString().slice(0,10);
+ };
+ return periods.map((period,i)=>{
+  const next=monthlyDueDate(joined,i+2);
+  return {...period,
+   reportStartInclusive:midpoint(period.periodStart,period.dueOn),
+   reportEndExclusive:midpoint(period.dueOn,next)};
+ });
+}
 export function compareMeasurements<T extends object>(
  first:T,
  latest:T,
