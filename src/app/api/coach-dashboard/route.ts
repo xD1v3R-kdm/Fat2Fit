@@ -18,11 +18,11 @@ export async function GET(request:Request){
   const [stats,members]=await Promise.all([
    query<{today:number;tomorrow:number;workoutsPending:number;videosPending:number}>(`
      select
-      (select count(*)::int from assignments where workspace_id=$1 and scheduled_on=$2::date) as today,
-      (select count(*)::int from assignments where workspace_id=$1 and scheduled_on=$2::date+1) as tomorrow,
-      (select count(*)::int from assignments where workspace_id=$1 and status='completed' and review_status='pending') as "workoutsPending",
+      (select count(*)::int from assignments where workspace_id=$1 and student_user_id<>$3 and scheduled_on=$2::date) as today,
+      (select count(*)::int from assignments where workspace_id=$1 and student_user_id<>$3 and scheduled_on=$2::date+1) as tomorrow,
+      (select count(*)::int from assignments where workspace_id=$1 and student_user_id<>$3 and status='completed' and review_status='pending') as "workoutsPending",
       (select count(*)::int from workout_videos v join assignments a on a.id=v.assignment_id
-       where a.workspace_id=$1 and v.status='pending') as "videosPending"`,[ws,date]),
+       where a.workspace_id=$1 and a.student_user_id<>$3 and v.status='pending') as "videosPending"`,[ws,date,userId]),
    query<Member>(`select u.id,u.display_name as name,u.telegram_id::text as "telegramId",
      (m.created_at at time zone 'Europe/Podgorica')::date::text as "joinedOn"
      from memberships m join users u on u.id=m.user_id
