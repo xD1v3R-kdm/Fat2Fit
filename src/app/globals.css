@@ -477,3 +477,45 @@ input,textarea,select {max-width:100%}
  #phone .top .top-actions{gap:4px}
  #phone .top .lang-select{width:52px;min-width:52px;max-width:52px}
 }
+
+
+/* Fat2Fit 0.8.4 — understated dumbbell artwork behind every screen.
+   Both source images come from the approved light background illustration.
+   Fixed decorative layer stays anchored to the phone viewport when views scroll.
+   Form controls and cards remain opaque and interactive above it. */
+#phone{isolation:isolate}
+#phone::before{
+  content:"";
+  position:fixed;
+  top:0;
+  left:50%;
+  width:min(100vw,450px);
+  height:100vh;
+  height:100dvh;
+  transform:translateX(-50%);
+  z-index:0;
+  pointer-events:none;
+  background-image:url("/backgrounds/ambient-dumbbell-light.webp");
+  background-repeat:no-repeat;
+  background-size:cover;
+  background-position:right bottom;
+  opacity:.9;
+}
+#phone[data-theme="dark"]::before{
+  background-image:url("/backgrounds/ambient-dumbbell-dark.webp");
+  opacity:1;
+}
+#phone>.top,
+#phone>#stage,
+#phone>.alert,
+#phone>.workspace-picker{
+  position:relative;
+  z-index:1;
+}
+#phone>.bottom{z-index:5}
+@media(min-width:550px){
+ #phone::before{
+  width:450px;
+  top:0;
+ }
+}
