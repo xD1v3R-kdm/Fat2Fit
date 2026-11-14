@@ -51,6 +51,7 @@ function ProgressBar({value}:{value:number}){return <div className="bar" role="p
 
 export default function Fat2Fit(){
  const [lang,setLang]=useState<Language>('ru'),[mode,setMode]=useState<Role>('coach'),[screen,setScreen]=useState<Screen>('dashboard');
+ const [theme,setTheme]=useState<'light'|'dark'>('light');
  const [data,setData]=useState<DemoData>(emptyData),[ready,setReady]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[toast,setToast]=useState('');
  const [me,setMe]=useState<Me|null>(null),[workspaceId,setWorkspaceId]=useState('');
  const [studentId,setStudentId]=useState('anna'),[selectedStudent,setSelectedStudent]=useState(''),[exerciseId,setExerciseId]=useState(''),[reportId,setReportId]=useState('');
@@ -83,6 +84,17 @@ export default function Fat2Fit(){
  const [historyAccess,setHistoryAccess]=useState<'full'|'summary'>('full');
  const [workoutSummary,setWorkoutSummary]=useState({strength:0,circuit:0,cardio:0,total:0});
  const [historyBusy,setHistoryBusy]=useState(false);
+ useEffect(()=>{
+  try{
+   const saved=localStorage.getItem('fat2fit-theme');
+   if(saved==='light'||saved==='dark')setTheme(saved);
+  }catch{}
+ },[]);
+ const changeTheme=()=>{
+  const next=theme==='light'?'dark':'light';
+  setTheme(next);
+  try{localStorage.setItem('fat2fit-theme',next);}catch{}
+ };
  const notify=(message:string)=>{setToast(message);setTimeout(()=>setToast(''),4200);};
  const measurementKey=(id:string,ws=workspaceId)=>`${ws}:${id}`;
  const loadCoachDashboard=useCallback(async(ws:string)=>{
@@ -661,15 +673,15 @@ export default function Fat2Fit(){
  {a.reviewNote&&<p className="detail-paragraph">{a.reviewNote}</p>}
  {a.items.map(item=><div key={`upload-${item.id}`}>{videoPicker(a,item)}</div>)}<button type="button" className="btn full" onClick={()=>void loadVideos(a.id).catch(fail)}>{copy('Показать проверки','View feedback','Prikaži pregled',lang)}</button>{(videosByAssignment[a.id]||[]).length>0&&videoReview(a,false)}</div>)}{historyAccess==='full'&& !completed.length&&<div className="card empty">{t('noResults',lang)}</div>}</div>;
  }
- if(!ready)return <div id="phone"><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view"><div className="card">{copy('Загрузка…','Loading…','Učitavanje…',lang)}</div></main></div>;
- if(!DEMO&&!workspaceId)return <div id="phone"><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view stack"><div className="card stack">
+ if(!ready)return <div id="phone" data-theme={theme}><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view"><div className="card">{copy('Загрузка…','Loading…','Učitavanje…',lang)}</div></main></div>;
+ if(!DEMO&&!workspaceId)return <div id="phone" data-theme={theme}><header className="top"><div className="brand"><span className="mark">↗</span> Fat2Fit</div></header><main id="stage" className="view stack"><div className="card stack">
  <h2>{error?copy('Не удалось войти','Sign-in failed','Prijava nije uspela',lang):copy('Нет доступа','Access required','Pristup nije dozvoljen',lang)}</h2>
  {error?<><p className="small muted">{copy('Ошибка входа на сервере. Проверьте настройки подключения и повторите попытку.','The server could not complete sign-in. Check the connection settings and retry.','Server nije uspeo da dovrši prijavu. Proverite podešavanja i pokušajte ponovo.',lang)}</p><p className="small muted">{error}</p><button type="button" className="btn primary full" onClick={()=>window.location.reload()}>{copy('Повторить вход','Retry sign-in','Pokušaj ponovo',lang)}</button></>
  :<p className="small muted">{copy('Откройте Mini App по приглашению тренера. Если вы тренер, ваш Telegram ID должен быть добавлен администратором.','Open the Mini App with a coach invitation. Coaches must be added by an administrator.','Otvorite Mini App preko pozivnice trenera.',lang)}</p>}
  </div></main></div>;
  let content:React.ReactNode;
  if(screen==='dashboard')content=dashboard();else if(screen==='students'||screen==='studentDetail')content=studentsView();else if(screen==='exercises'||screen==='exerciseDetail'||screen==='exerciseNew')content=exercisesView();else if(screen==='templates'||screen==='templateNew')content=templatesView();else if(screen==='assign')content=assignView();else if(screen==='reports'||screen==='reportDetail')content=reportView();else if(screen==='workout'||screen==='coachWorkout')content=workoutView();else content=historyView();
- return <div id="phone"><header className="top"><div className="topline"><div className="brand"><span className="mark" aria-hidden="true">↗</span><span>Fat2Fit</span>{DEMO&&<span className="preview">{t('preview',lang)}</span>}</div><div className="top-actions"><select className="lang-select" aria-label={t('language',lang)} value={lang} onChange={e=>changeLanguage(e.target.value as Language)}><option value="ru">RU</option><option value="en">EN</option><option value="cg">CG</option></select>{DEMO&&<div className="role">{(['coach','student'] as Role[]).map(r=><button type="button" className={mode===r?'on':''} key={r} aria-pressed={mode===r} onClick={()=>{setMode(r);setScreen('dashboard');setError('');}}>{t(r,lang)}</button>)}</div>}</div></div></header>{!DEMO&&me&&me.memberships.length>1&&<div className="workspace-picker">
+ return <div id="phone" data-theme={theme}><header className="top"><div className="topline"><div className="brand"><span className="mark" aria-hidden="true">↗</span><span>Fat2Fit</span>{DEMO&&<span className="preview">{t('preview',lang)}</span>}</div><div className="top-actions"><button type="button" className="theme-toggle" aria-label={theme==='light'?copy('Включить тёмную тему','Enable dark theme','Uključi tamnu temu',lang):copy('Включить светлую тему','Enable light theme','Uključi svijetlu temu',lang)} title={theme==='light'?copy('Тёмная тема','Dark theme','Tamna tema',lang):copy('Светлая тема','Light theme','Svijetla tema',lang)} aria-pressed={theme==='dark'} onClick={changeTheme}>{theme==='dark'?'☀':'☾'}</button><select className="lang-select" aria-label={t('language',lang)} value={lang} onChange={e=>changeLanguage(e.target.value as Language)}><option value="ru">RU</option><option value="en">EN</option><option value="cg">CG</option></select>{DEMO&&<div className="role">{(['coach','student'] as Role[]).map(r=><button type="button" className={mode===r?'on':''} key={r} aria-pressed={mode===r} onClick={()=>{setMode(r);setScreen('dashboard');setError('');}}>{t(r,lang)}</button>)}</div>}</div></div></header>{!DEMO&&me&&me.memberships.length>1&&<div className="workspace-picker">
   <label htmlFor="fat2fit-coach-picker">{copy('Тренер и команда','Coach / team','Trener i tim',lang)}</label>
   <select id="fat2fit-coach-picker" aria-label={copy('Выбрать тренера','Select coach','Odaberi trenera',lang)}
     value={workspaceId} onChange={e=>chooseWorkspace(e.target.value)}>
