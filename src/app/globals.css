@@ -388,7 +388,7 @@ input,textarea,select {max-width:100%}
 }
 #phone[data-theme="dark"] input::placeholder,
 #phone[data-theme="dark"] textarea::placeholder{color:#a2adbc;opacity:1}
-#phone[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.9)}
+#phone[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:none}
 #phone[data-theme="dark"] input:disabled,
 #phone[data-theme="dark"] select:disabled,
 #phone[data-theme="dark"] textarea:disabled{opacity:.62}
