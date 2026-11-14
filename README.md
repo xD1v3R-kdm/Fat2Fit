@@ -1,174 +1,151 @@
-# Fat2Fit 0.4 — Совместные тренировки и видеопроверка техники
+<div align="center">
 
-> **PostgreSQL TLS:** В Supabase → Database Settings → SSL Configuration скачайте публичный корневой сертификат `prod-ca-2021.crt`. Содержимое целиком (включая `BEGIN CERTIFICATE` и `END CERTIFICATE`) поместите в переменную Vercel `SUPABASE_DB_CA_CERT` для Production/Preview. Подключение проверяет цепочку сертификатов и имя хоста; не отключайте `rejectUnauthorized` и не устанавливайте `NODE_TLS_REJECT_UNAUTHORIZED=0`.
+# ↗ Fat2Fit
 
-**Новые функции (5 ноября 2026 года):**
+### Personal training, without the spreadsheet chaos.
 
-- Тренер открывает ученика → назначенную тренировку → **«Отмечать подходы»**, изменяет повторения/вес, отмечает подходы и может завершить занятие. Автор каждого изменения сохраняется в `set_logs.recorded_by`.
-- Ученик открывает упражнение во время тренировки или в истории → **«Видео на проверку»** → выбирает MP4/MOV/WebM до 50 МиБ. Видео отправляется напрямую в **приватный** Supabase Storage по краткоживущей подписанной ссылке.
-- Тренер видит ожидающие проверки видео в панели и отчёте ученика, просматривает запись и выбирает «Верно» или «Исправить» с комментарием.
-- У ученика результаты открытого занятия обновляются раз в 5 секунд, пока экран тренировки активен.
-- Английская версия: верхние кнопки ролей и подписи нижней навигации сохраняют один ряд на мобильной ширине.
+**A Telegram Mini App for coaches and their students — designed, built and shipped from 0 → 1.**
 
-## Настройка базы
+**Live private pilot** · **v0.8** · **RU / EN / CG**
 
-**Проверено в подключённом Supabase**: миграция `20261105104923_fat2fit_coach_sets_and_workout_videos.sql` уже применена к существующему проекту, повторно применять её не требуется. Если разворачиваете Fat2Fit в другой базе, выполните эту миграцию один раз после первоначальной схемы.
+[**Product case study**](docs/CASE_STUDY.md) · [**Architecture**](docs/ARCHITECTURE.md) · [**Open Telegram app ↗**](https://t.me/fat2fitapp_bot/Fat2Fitgymapp)
 
-Созданы `public.workout_videos`, новое поле `public.set_logs.recorded_by` и приватный Storage bucket `fat2fit-workout-videos` (50 МиБ, MP4/MOV/WebM).
+<sub>The live app is invite-only. Reviewers can explore the UI using the local demo instructions below.</sub>
 
-Новые **серверные** переменные окружения:
-
-```
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<secret from Supabase dashboard>
-```
-
-Используйте настройки Vercel → Environment Variables. Секрет нельзя отправлять в браузер, коммитить в GitHub или делать `NEXT_PUBLIC_`-переменной. Остальные переменные остаются из `.env.example`. Публичная production-сборка откажется запускаться без обязательной конфигурации.
-
-## API
-
-- `PATCH /api/assignments/:id/sets` — изменять подходы могут ученик или тренер того же Workspace; завершённые занятия остаются неизменяемыми.
-- `POST /api/assignments/:id/finish` — ученик или тренер завершают тренировку.
-- `POST /api/assignments/:id/videos` — только ученик создаёт запрос на подписанную загрузку; доступ и принадлежность упражнения проверяются на сервере.
-- `PATCH /api/assignments/:id/videos/:videoId` с `action: "confirm"` — подтверждает существование загруженного объекта в приватном хранилище.
-- `GET /api/assignments/:id/videos` — только участники с правом доступа получают временные ссылки просмотра.
-- `PATCH /api/assignments/:id/videos/:videoId` с `action: "review"` — только тренер может одобрить либо запросить исправление.
-
-**Важно:** установленные ограничения и права доступа проверены тестами и аудитом схемы. Полная Next.js-сборка и отправка настоящего видео в Telegram требуют подключённых серверных переменных и опубликованного приложения; эти сценарии пока не были проверены end-to-end.
+</div>
 
 ---
 
-# Fat2Fit 0.3.1 — Telegram Mini App
+## The product, in 30 seconds
 
-Рабочий **исходный проект** Next.js + TypeScript + PostgreSQL для управления тренировками. Перенесены ключевые сценарии Fat2Fit 2.0 в React, CSS адаптирован из исходного мобильного прототипа. Старый, полностью автономный HTML-прототип сохранён в `reference/fat2fit-v2.html`.
+Personal trainers often manage workout plans, exercise notes, videos, progress measurements and student conversations across several disconnected tools. That adds friction for both sides.
 
-> **Статус:** исходники и SQL-миграции подготовлены; Telegram-авторизация реализована на уровне API; деморежим работает с локальными данными. **Продакшен-развёртывание, npm-сборка и реальное подключение к Supabase/Telegram в данной среде не выполнялись** — нет доступа к npm-реестру, отсутствуют ваши секреты. Не объявлять проект готовым к публичному запуску до E2E-проверки.
+**Fat2Fit brings the core coaching workflow into Telegram**, where coaches and students already communicate.
 
-> **Vercel/Supabase:** отдельная пошаговая инструкция — [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md). Есть автоматический preflight для публичных деплоев (`npm run preflight:production`).
+| For coaches | For students |
+| --- | --- |
+| Manage a private list of clients | Open assigned workouts directly in Telegram |
+| Create, edit and reuse exercise libraries | Track sets, reps, weights and completion |
+| Build templates **or** assemble ad-hoc workouts | Submit technique videos for feedback |
+| Review workouts and videos, with separate queues | Record weight, body measurements and muscle mass |
+| See today's and tomorrow's training workload | Compare first and latest measurements |
+| Request monthly measurement reports | Control which coach workspace is currently active |
 
-## 1. Запуск деморежима на Mac
+**Product principle:** *Make it easier to train together than to coordinate the training.*
 
-Требуется Node.js 20.9+ (рекомендуется 22+).
+## Product walkthrough
+
+```text
+COACH                                         STUDENT
+
+Invite student via Telegram ────────────────► Join the coach's workspace
+Create exercises / build a workout ─────────► See the assigned workout
+Review completed sets ◄────────────────────── Log sets, reps and weight
+Review technique video ◄──────────────────── Upload a private video
+Request monthly progress report ───────────► Submit body measurements
+Track the coaching workload ◄──────────────── Review feedback and progress
+```
+
+Everything relevant to a particular coach–student relationship stays within that coach's workspace. A student can work with more than one coach without merging the coaching relationships or monthly reports.
+
+## What is implemented
+
+- **Telegram-native onboarding:** verified Telegram `initData`, signed HttpOnly sessions and expiring one-use invitations.
+- **Workout planning:** reusable templates, custom exercise definitions, ad-hoc assignments, workout categories and coach self-training.
+- **During a session:** actual vs. planned sets, repetitions and weights, with coach-assisted logging.
+- **Async feedback:** private technique-video uploads, coach review, comments and a separate approval flow for completed workouts.
+- **Body progress:** dated measurements, historical records and a first-to-latest comparison without imposing a universal “good” direction.
+- **Coach action center:** four simultaneous counters for today, tomorrow, workouts awaiting review and videos awaiting review.
+- **Monthly check-ins:** a calendar-month schedule tied to each individual coach–student relationship, with Telegram requests initiated by the coach.
+- **Granular access:** coaches can choose whether a student sees full workout history or only completed-session totals by category.
+- **Localized mobile UI:** Russian, English and Montenegrin (Latin), designed around Telegram WebView on phones.
+
+## Why this is a product-management case
+
+I used Fat2Fit to work through the complete product loop: **problem → MVP → architecture → implementation → deployment → real-user feedback → iteration**.
+
+Several changes came directly from using the app with actual coaching scenarios: a coach needed to log his own workouts, workouts should not always require templates, exercise descriptions needed editing, and mobile navigation/date inputs needed fixes on iOS.
+
+The challenge was not just to build screens. It was to **design a permission model, prioritize the smallest useful workflows and keep a working production pilot while iterating.**
+
+[**Read the full case study →**](docs/CASE_STUDY.md)
+
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    TG["Telegram Mini App<br/>React / Next.js"] --> API["Next.js API routes<br/>Telegram auth + role checks"]
+    API --> DB[("Supabase PostgreSQL<br/>coach-owned workspaces")]
+    API --> ST[("Private Supabase Storage<br/>exercise videos")]
+    API --> BOT["Telegram Bot API<br/>progress requests"]
+    CI["GitHub Actions"] --> V["Vercel deployment"]
+```
+
+**Stack:** Next.js 16 · React 19 · TypeScript · Node.js 24 · PostgreSQL · Supabase · Telegram Web Apps · Vercel · GitHub Actions.
+
+Selected engineering choices:
+
+- Server-side verification of Telegram authentication; the browser does not hold the bot token or database credentials.
+- Coach-owned workspaces and role checks for the relevant data-access routes.
+- Signed URLs for uploading/playing videos from private storage.
+- Immutable assignment copies so changing a workout template does not retroactively rewrite an assigned session.
+- Automated tests covering Telegram validation, data shapes, deployment prerequisites and calendar-month reporting rules.
+
+[**Architecture notes →**](docs/ARCHITECTURE.md) · [**Acceptance checklist →**](docs/fat2fit-08-acceptance.md)
+
+## Try it
+
+### Live app
+
+[**Open Fat2Fit in Telegram ↗**](https://t.me/fat2fitapp_bot/Fat2Fitgymapp)
+
+Production access is deliberately invitation-based. Opening the app without a coaching invitation is **not** a public demo.
+
+### Run the local UI demo
+
+Requires **Node.js 24**.
 
 ```bash
-unzip fat2fit-0.3.1-source.zip
-cd fat2fit-0.3.1
-cp .env.example .env.local
-# В .env.local оставьте NEXT_PUBLIC_DEMO_MODE=true
+git clone https://github.com/xD1v3R-kdm/Fat2Fit.git
+cd Fat2Fit
 npm install
+cp .env.example .env.local
+# Keep NEXT_PUBLIC_DEMO_MODE=true for the offline local demo
 npm run dev
 ```
 
-Откройте `http://localhost:3000` в браузере. В деморежиме можно переключать тренера/ученика, создавать упражнения с локализованными текстами, редактировать **собственные** упражнения, составлять и редактировать шаблоны, назначать тренировки Анне/Максиму/Игорю, отмечать подходы, завершать тренировку и просматривать отчёты. Демо сохраняется в `localStorage` браузера под ключом `fat2fit-03-demo` (старые данные `gymtrack-03-demo` импортируются автоматически). Перезагрузка сохраняет данные.
-
-Сохранённый дизайн-прототип Fat2Fit 2.0 сохранён в `reference/fat2fit-v2.html` и открывается как локальный HTML-файл. В публичные файлы Next.js он **не включён** — это референс дизайна, а не обход серверной авторизации.
-
-## 2. Включение PostgreSQL и Telegram (после тестирования демо)
-
-1. Используйте **существующий** проект Supabase (ref `hjckimoritnehwwazszf`). Начальная схема и каталог уже находятся в нём. **Не запускайте** `001_initial.sql` и `002_seed_catalog.sql` повторно.
-2. Создайте бота в `@BotFather` и Mini App с коротким именем (`app_short_name`). Укажите публичный HTTPS URL Vercel-проекта.
-3. Узнайте **свой** Telegram user ID, добавьте его в `BOOTSTRAP_COACH_TELEGRAM_IDS`. При первом входе по валидной Telegram-подписи сервер создаст для вас workspace тренера.
-4. Настройте в Vercel/environment `.env.local` (но **не коммитьте** его):
-
-```dotenv
-NEXT_PUBLIC_DEMO_MODE=false
-DATABASE_URL=postgresql://...              # server-only; Supabase transaction pooler port 6543
-TELEGRAM_BOT_TOKEN=...                      # only on server
-SESSION_SECRET=...                          # openssl rand -hex 32
-BOOTSTRAP_COACH_TELEGRAM_IDS=123456789
-TELEGRAM_BOT_USERNAME=YourFat2FitBot
-TELEGRAM_MINI_APP_SHORT_NAME=app
-NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
-```
-
-5. Разверните Next.js через Vercel (после `npm run typecheck`, `npm run test`, `npm run build`). Откройте Mini App через Telegram. Доступ ученика выдаётся одноразовой ссылкой из интерфейса тренера; приглашение истекает через 7 дней.
-
-**Примечание:** BotFather настраивает вход в Mini App; обработчик обычных сообщений `/start` и push-уведомления ботом пока **не реализованы**. Это отдельный следующий инкремент. Не отправляйте бот-токен или `DATABASE_URL` в чат.
-
-## 3. Архитектура и безопасность
-
-```text
-Telegram client
-  │ raw signed initData
-  ▼
-Next.js route /api/auth/telegram → Telegram HMAC SHA-256 → signed HttpOnly cookie
-  │
-  ├── /api/me
-  ├── /api/exercises, /api/exercises/[id]
-  ├── /api/templates, /api/templates/[id]
-  ├── /api/students
-  ├── /api/invitations, /api/invitations/redeem
-  └── /api/assignments, /api/assignments/[id]/sets|finish
-  │
-  ▼
-Server-side pg connection → PostgreSQL (Supabase)
-```
-
-- **Multi-tenant:** `workspaces` + `memberships`. Один и тот же пользователь может состоять в разных рабочих пространствах.
-- **Auth:** сервер валидирует `Telegram.WebApp.initData` по официальному алгоритму HMAC, проверяет свежесть (`auth_date` ≤ 24ч) и устанавливает подписанную HttpOnly сессию. В production нет переключателя ролей и анонимного демодоступа.
-- **Authorization:** каждый API-метод проверяет членство в указанном Workspace; запись упражнений/шаблонов/назначений разрешена только тренеру, фиксация подходов — только назначенному ученику.
-- **RLS/grants:** для таблиц включён RLS и отозваны права `anon/authenticated`. Доступ к БД осуществляется только сервером с секретным `DATABASE_URL`, поэтому решение НЕ зависит от Supabase Auth JWT и публичных RLS-политик; изоляция осуществляется серверной проверкой и SQL-фильтрами. Предполагается, что прямой доступ к БД извне закрыт. До масштабирования желательно интеграционно протестировать границы tenants.
-- **Шаблоны/назначения:** при назначении копируются параметры упражнений в `assignment_exercises`, поэтому изменение шаблона не переписывает прошлые назначения.
-- **Факт:** каждый подход фиксируется в `set_logs` с `set_index`, количеством повторений, весом, статусом и timestamp. Дублирование исключено PK (`assignment_exercise_id`, `set_index`).
-- **Каталог:** `exercises.workspace_id = NULL` — общая библиотека (только чтение в UI), `workspace_id = UUID` — свои упражнения тренера. Названия/описания/FAQ доступны на `ru`, `en`, `sr` (латиница), с fallback при отсутствии перевода.
-
-## 4. Текущее покрытие по функциям
-
-| Функция | Демо React | API PostgreSQL |
-|---|---|---|
-| Интерфейсы тренера/ученика | Да | Реальные роли |
-| RU / EN / SR (латиница) | Да | Язык сохраняется у пользователя |
-| Каталог упражнений | Да | Чтение глобальных и своих |
-| Создание своего упражнения | Да | Да |
-| Редактирование упражнения | Да | Да, только своего |
-| Фото, видео и FAQ | По HTTPS-ссылке | По HTTPS-ссылке |
-| Шаблоны тренировок | Создание/редактирование | Да |
-| Назначения | Да | Да, snapshots |
-| Выполнение подходов | Да | Да, отдельные записи |
-| История и отчёты | Да | Да |
-| Приглашения | Заглушка | Одноразовые ссылки, 7 дней |
-| Загрузка фотофайла (не URL) | Нет (есть в HTML v2) | Нет — следующий инкремент со Storage |
-| Бот: уведомления / команды | Нет | Пока нет |
-| Offline очередь повторной синхронизации | Нет | Пока нет |
-| Оплаты, аналитика, таймер | Нет | Позже |
-
-## 5. Проверки
+Open `http://localhost:3000`. The demo uses sample data; it does not connect to the production database or Telegram account. **Do not commit `.env.local`.**
 
 ```bash
-npm test             # unit tests алгоритма Telegram HMAC + статические проверки схемы
-npm run typecheck    # TypeScript
-npm run build        # Next production build
+npm test              # Automated unit checks
+npm run typecheck     # TypeScript validation
+npm run build         # Demo-mode build when .env.local enables demo mode
 ```
 
-В рабочей среде проверены синтаксические преобразования TS/TSX и unit/static tests. Полная установка npm-зависимостей и smoke/browser-тестирование **не были возможны** — выполнить указанные команды после `npm install`.
+Production deployment requires private environment variables configured outside Git. See the intentionally sanitized [environment template](.env.example).
 
-### Рекомендуемый E2E smoke test с настоящей инфраструктурой
+## Project structure
 
-1. Тренер входит через Telegram и создаёт упражнение RU/EN/SR.
-2. Создаёт шаблон, назначает ученику по приглашению.
-3. Ученик выполняет 2 подхода с разным весом, закрывает Telegram, открывает повторно.
-4. Проверяем сохранение подходов; завершает тренировку.
-5. Тренер открывает отчёт и видит фактические значения.
-6. Другой ученик не может запросить результаты первого; второй Workspace не видит чужих данных.
-7. Убедиться, что `/api/` не отвечает анонимным браузерным запросам без Telegram-сессии.
+| Path | Purpose |
+| --- | --- |
+| `src/components/Fat2Fit.tsx` | Coach/student interface and mobile workflows |
+| `src/app/api/` | Authenticated application API |
+| `src/lib/` | Telegram verification, sessions, data access and business rules |
+| `supabase/migrations/` | Versioned database evolution |
+| `tests/` | Automated checks |
+| `.github/workflows/` | CI validation |
+| `docs/` | Product case study, architecture and release acceptance |
 
-## 6. Следующий инкремент (0.4)
+## Status & transparency
 
-- Supabase Storage: загрузка и сжатие фотографий, политика доступа; видео по ссылкам.
-- Приглашения и `/start` в Telegram-боте; уведомления о завершённых тренировках.
-- Надёжная офлайн-очередь подходов и повторная синхронизация при обрыве сети.
-- Интеграционные тесты с реальным Postgres и E2E Playwright на 320 / 390 / 430 px.
-- Резервное копирование БД и мониторинг ошибок перед пилотом.
+**Status:** deployed and used in a small, invite-only pilot. This is a working side project, not a commercial SaaS launch. I am **not** claiming validated retention, revenue, acquisition or performance improvements. Some cross-account, Telegram delivery and mobile edge cases remain subject to ongoing user testing.
 
-## 7. Подготовка к Vercel и Supabase (0.3.1)
+**Development:** product direction, user journeys, prioritization and acceptance criteria were driven by me; implementation was iterated with AI-assisted development and direct testing. This repository is presented as a **product-building and product-leadership case**, not as evidence of unaided authorship of every line.
 
-Для публикации используйте инструкцию `DEPLOY_VERCEL.md` и файлы в `scripts/`.
-При сборке в Vercel `scripts/vercel-preflight.mjs` запрещает публиковать деморежим
-и требует реальные серверные переменные окружения. Ни один секрет не должен
-попасть в Git или переменную с префиксом `NEXT_PUBLIC_`.
+---
 
-После выполнения SQL-миграций проверьте доступ к данным с помощью
-`scripts/database-check.sql` (Supabase SQL Editor). После появления HTTPS-адреса
-запустите `npm run smoke:public -- https://your-app.vercel.app`, затем проверьте
-авторизованный вход и цикл тренировки на двух разных аккаунтах Telegram.
-В этой среде **реальное развертывание ещё не выполнено**.
+**Built by [Dmitry Komkov](https://www.linkedin.com/in/dmitrykomkov/)** · Product leadership, 0 → 1 and delivery systems
+
+[Portfolio](https://dmitrykomkov.netlify.app) · [LinkedIn](https://www.linkedin.com/in/dmitrykomkov/) · [Contact](mailto:komkov.kdm@gmail.com)
+
+<sub>Portfolio source. No open-source license is currently granted; please contact the author about reuse. No user data, access tokens or database passwords should be committed to this repository.</sub>
