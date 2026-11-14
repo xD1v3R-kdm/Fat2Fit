@@ -427,3 +427,53 @@ input,textarea,select {max-width:100%}
  body:has(#phone[data-theme="dark"]){background:#14161a}
  #phone[data-theme="dark"]{border-color:#434a55}
 }
+
+
+/* Fat2Fit 0.8.3 — single-row, uniform top toolbar for mode, theme and language.
+   Mode labels remain readable, but each control shares the same height,
+   border, radius, typography and light/dark surfaces. */
+#phone .top .topline{display:flex;align-items:center;flex-wrap:nowrap;gap:5px}
+#phone .top .top-actions{display:flex;align-items:center;flex-shrink:0;gap:5px;margin-left:auto;min-width:0}
+#phone .top .mode-toggle,
+#phone .top .theme-toggle,
+#phone .top .lang-select{
+  box-sizing:border-box;
+  height:38px;min-height:38px;
+  border:1px solid #dce4ee;
+  border-radius:10px;
+  background:#e8edf6;
+  color:#244167;
+  font-family:inherit;
+  font-weight:800;
+  line-height:1;
+}
+#phone .top .mode-toggle{
+  display:flex;align-items:center;justify-content:center;gap:3px;
+  min-width:76px;max-width:87px;padding:0 7px;
+  font-size:11px;white-space:nowrap;
+}
+#phone .top .mode-switch-glyph{font-size:14px;line-height:1;opacity:.67}
+#phone .top .theme-toggle{
+  flex:0 0 38px;width:38px;padding:0;
+  display:grid;place-items:center;font-size:22px;
+}
+#phone .top .lang-select{
+  width:55px;min-width:55px;max-width:55px;padding:0 4px;
+  font-size:11px;text-align:center;
+}
+#phone[data-theme="dark"] .top .mode-toggle,
+#phone[data-theme="dark"] .top .theme-toggle,
+#phone[data-theme="dark"] .top .lang-select{
+  background:#323740;color:#edf1f6;border-color:#505865;
+}
+#phone .top .mode-toggle:focus-visible,
+#phone .top .theme-toggle:focus-visible,
+#phone .top .lang-select:focus-visible{
+  outline:3px solid #86b7ff;outline-offset:2px;
+}
+@media(max-width:350px){
+ #phone .top{padding-left:10px;padding-right:10px}
+ #phone .top .mode-toggle{min-width:72px;padding:0 5px;font-size:10px}
+ #phone .top .top-actions{gap:4px}
+ #phone .top .lang-select{width:52px;min-width:52px;max-width:52px}
+}
