@@ -232,6 +232,22 @@ export default function Fat2Fit(){
    selectScreen('exercises');notify(editingExerciseId?copy('Упражнение обновлено','Exercise updated','Vježba je izmijenjena',lang):copy('Упражнение добавлено','Exercise added','Vježba je dodata',lang));setEditingExerciseId('');
   }catch(e){fail(e);}finally{setBusy(false);}
  };
+ const changeExerciseSharing=async(ex:Exercise)=>{
+  if(!workspaceId||ex.workspaceId!==workspaceId||busy)return;
+  setBusy(true);setError('');
+  try{
+   if(DEMO)updateData(d=>({...d,exercises:d.exercises.map(item=>item.id===ex.id
+    ?{...item,isShared:!Boolean(item.isShared)}:item)}));
+   else{
+    await api(`/exercises/${ex.id}/sharing`,'PATCH',
+     {workspaceId,isShared:!Boolean(ex.isShared)});
+    await refresh();
+   }
+   notify(ex.isShared
+    ?copy('Упражнение больше не публикуется','Exercise is now private','Vježba je sada privatna',lang)
+    :copy('Упражнение доступно всем тренерам','Exercise shared with all coaches','Vježba je dostupna svim trenerima',lang));
+  }catch(e){fail(e);}finally{setBusy(false);}
+ };
  const addTemplate=async(e:React.FormEvent)=>{e.preventDefault();if(!draftTemplate.items.length)return setError(copy('Добавьте хотя бы одно упражнение','Add at least one exercise','Dodajte barem jednu vežbu',lang));
   if(!Object.values(draftTemplate.title).some(Boolean))return setError(copy('Введите название шаблона','Enter a template title','Unesite naziv šablona',lang));
   setBusy(true);try{
