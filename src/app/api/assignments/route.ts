@@ -51,11 +51,11 @@ export async function POST(request:Request){
     finalTitle=title;workoutType=type;
     finalItems=rows;
     for(const item of rows){
-     const allowed=await c.query("select 1 from exercises where id=$1 and (workspace_id is null or workspace_id=$2 or is_shared=true
+     const allowed=await c.query(`select 1 from exercises where id=$1 and (workspace_id is null or workspace_id=$2 or is_shared=true
       or exists(select 1 from template_exercises te join workout_templates wt on wt.id=te.template_id
            where te.exercise_id=exercises.id and wt.workspace_id=$2)
       or exists(select 1 from assignment_exercises ae join assignments a on a.id=ae.assignment_id
-           where ae.exercise_id=exercises.id and a.workspace_id=$2))",[item.exerciseId,ws]);
+           where ae.exercise_id=exercises.id and a.workspace_id=$2))`,[item.exerciseId,ws]);
      if(!allowed.rowCount)throw new ApiError(403,'Exercise unavailable');
     }
    }else{
