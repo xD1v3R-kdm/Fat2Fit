@@ -28,7 +28,7 @@ type DraftTemplate={title:Localized;items:WorkoutItem[];workoutType:WorkoutType}
 type WebApp={initData:string;initDataUnsafe?:{start_param?:string};ready?:()=>void;expand?:()=>void;openTelegramLink?:(url:string)=>void};
 declare global {interface Window {Telegram?:{WebApp?:WebApp}}}
 const DEMO=process.env.NEXT_PUBLIC_DEMO_MODE==='true';
-const newDraft=():DraftExercise=>({group:'chest',equipment:'',photoUrl:'',videoUrl:'',translations:{ru:{name:'',description:'',faq:''},en:{name:'',description:'',faq:''},cg:{name:'',description:'',faq:''}}});
+const newDraft=():DraftExercise=>({group:'chest',equipment:'',photoUrl:'',videoUrl:'',translations:{ru:{name:'',description:'',coachTips:'',faq:''},en:{name:'',description:'',coachTips:'',faq:''},cg:{name:'',description:'',coachTips:'',faq:''}}});
 const uid=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():`temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const tabs:{screen:Screen;icon:string;key:Phrase}[]=[{screen:'dashboard',icon:'⌂',key:'dashboard'},{screen:'students',icon:'♧',key:'students'},{screen:'exercises',icon:'◈',key:'exercises'},{screen:'templates',icon:'▤',key:'templates'},{screen:'reports',icon:'▥',key:'reports'}];
 const studentTabs:{screen:Screen;icon:string;key:Phrase}[]=[{screen:'dashboard',icon:'⌂',key:'dashboard'},{screen:'workout',icon:'▤',key:'workout'},{screen:'exercises',icon:'◈',key:'exercises'},{screen:'history',icon:'▥',key:'history'}];
@@ -485,7 +485,7 @@ export default function Fat2Fit(){
     if(mode==='coach'){setReportId(a.id);selectScreen('reportDetail');}else selectScreen('history');notify(copy('Тренировка завершена','Workout completed','Trening je završen',lang));
    }catch(e){fail(e);}finally{setBusy(false);}
  };
- const setDraftTranslation=(key:'name'|'description'|'faq',v:string)=>setDraftExercise(d=>({...d,translations:{...d.translations,[draftLang]:{...d.translations[draftLang], [key]:v}}}));
+ const setDraftTranslation=(key:'name'|'description'|'coachTips'|'faq',v:string)=>setDraftExercise(d=>({...d,translations:{...d.translations,[draftLang]:{...d.translations[draftLang], [key]:v}}}));
  const addTemplateExercise=(ex:Exercise)=>setDraftTemplate(d=>({...d,items:[...d.items,{id:uid(),exerciseId:ex.id,sets:3,reps:10,weight:0,rest:90}]}));
  const updateTemplateItem=(id:string,field:'sets'|'reps'|'weight'|'rest',value:string)=>setDraftTemplate(d=>({...d,items:d.items.map(i=>i.id===id?{...i,[field]:num(value)}:i)}));
  const navs=mode==='coach'?tabs:studentTabs;
