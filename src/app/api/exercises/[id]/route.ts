@@ -7,19 +7,19 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
   const {id}=await params,b=await request.json();
   if(!isUuid(id))throw new ApiError(400,'Invalid exercise');
   const ws=b.workspaceId,{userId}=await requireWorkspace(ws,['coach']);
-  const translations:Record<string,{name:string;description:string;faq:string}>={};
+  const translations:Record<string,{name:string;description:string;coachTips:string;faq:string}>={};
   for(const l of ['ru','en','cg']){
    const x=b.translations?.[l]||{};
-   translations[l]={name:parseText(x.name,120),description:parseText(x.description,3000),faq:parseText(x.faq,2000)};
+   translations[l]={name:parseText(x.name,120),description:parseText(x.description,3000),coachTips:parseText(x.coachTips,2000),faq:parseText(x.faq,2000)};
   }
   validTitle(Object.fromEntries(Object.entries(translations).map(([k,v])=>[k,v.name])));
   const group=parseText(b.group,30)||'other',equipment=parseText(b.equipment,120);
   const photoUrl=validUrl(b.photoUrl),videoUrl=validUrl(b.videoUrl),data=JSON.stringify(translations);
   await transaction(async client=>{
    const found=await client.query<{workspace_id:string|null}>(
-    'select workspace_id from exercises where id=$1 and (workspace_id is null or workspace_id=$2) for update',[id,ws]);
+    'select workspace_id from exercises where id=$1 and (workspace_id is null or workspace_id=$2 or is_shared=true) for update',[id,ws]);
    if(!found.rows.length)throw new ApiError(404,'Exercise not found');
-   if(found.rows[0].workspace_id===null){
+   if(found.rows[0].workspace_id!==ws){
     // The shared library remains untouched. Edits apply to this workspace only,
     // preserving exercise IDs in existing workout templates and assignments.
     await client.query(`insert into exercise_overrides
