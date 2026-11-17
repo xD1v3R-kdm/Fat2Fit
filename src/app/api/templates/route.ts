@@ -13,11 +13,11 @@ if(!['strength','circuit','cardio'].includes(b.workoutType))throw new ApiError(4
 if(!Array.isArray(b.items)||b.items.length>30)throw new ApiError(400,'Invalid template exercises');
 const rows=b.items.map((i:Record<string,unknown>)=>{if(!isUuid(i.exerciseId))throw new ApiError(400,'Invalid exercise');return {exerciseId:i.exerciseId,sets:validNumber(i.sets,1,30),reps:validNumber(i.reps,1,1000),weight:validNumber(i.weight,0,9999),rest:validNumber(i.rest,0,3600)};});
 const result=await transaction(async c=>{
- for(const i of rows){const allowed=await c.query('select 1 from exercises where id=$1 and (workspace_id is null or workspace_id=$2 or is_shared=true
+ for(const i of rows){const allowed=await c.query(`select 1 from exercises where id=$1 and (workspace_id is null or workspace_id=$2 or is_shared=true
       or exists(select 1 from template_exercises te join workout_templates wt on wt.id=te.template_id
            where te.exercise_id=exercises.id and wt.workspace_id=$2)
       or exists(select 1 from assignment_exercises ae join assignments a on a.id=ae.assignment_id
-           where ae.exercise_id=exercises.id and a.workspace_id=$2))',[i.exerciseId,ws]);if(!allowed.rowCount)throw new ApiError(403,'Exercise unavailable');}
+           where ae.exercise_id=exercises.id and a.workspace_id=$2))`,[i.exerciseId,ws]);if(!allowed.rowCount)throw new ApiError(403,'Exercise unavailable');}
  const t=await c.query<{id:string}>('insert into workout_templates(workspace_id,title,created_by,workout_type) values($1,$2::jsonb,$3,$4) returning id',[ws,JSON.stringify(title),userId,b.workoutType]);
  for(let n=0;n<rows.length;n++){const i=rows[n];await c.query('insert into template_exercises(template_id,exercise_id,position,planned_sets,planned_reps,planned_weight,rest_seconds) values($1,$2,$3,$4,$5,$6,$7)',[t.rows[0].id,i.exerciseId,n,i.sets,i.reps,i.weight,i.rest]);}
  return t.rows[0].id;});return NextResponse.json({id:result},{status:201});
