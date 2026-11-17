@@ -519,3 +519,28 @@ input,textarea,select {max-width:100%}
   top:0;
  }
 }
+
+
+/* Fat2Fit: coach-owned and opt-in shared exercise catalog. */
+#phone .exercise-scope{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:4px;padding:4px;border-radius:13px;background:#e7ecf5;
+}
+#phone .exercise-scope button{
+ min-width:0;min-height:40px;border:0;border-radius:10px;
+ color:#62758d;background:transparent;font-weight:800;font-size:12px;
+}
+#phone .exercise-scope button.active{
+ background:#fff;color:#2469e9;box-shadow:0 2px 7px #172b4e15;
+}
+#phone .exercise-access-meta{
+ display:inline-block;margin-top:5px;color:#4772ac;
+ font-size:10px;font-weight:750;line-height:1.3;
+}
+#phone .exercise-sharing .small{line-height:1.5;margin:0}
+#phone[data-theme="dark"] .exercise-scope{background:#313842}
+#phone[data-theme="dark"] .exercise-scope button{color:#bdc9d8}
+#phone[data-theme="dark"] .exercise-scope button.active{
+ background:#454d5b;color:#bad1fc;box-shadow:0 2px 8px #0004;
+}
+#phone[data-theme="dark"] .exercise-access-meta{color:#a6c3f0}
