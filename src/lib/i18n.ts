@@ -15,6 +15,7 @@ export const dictionary = {
   add:['Добавить','Add','Dodaj'], save:['Сохранить','Save','Sačuvaj'], cancel:['Отмена','Cancel','Otkaži'],
   name:['Название','Name','Naziv'], group:['Группа мышц','Muscle group','Mišićna grupa'],
   equipment:['Оборудование','Equipment','Oprema'], technique:['Техника','Technique','Tehnika'],
+  coachTips:['Советы тренера','Coach’s tips','Savjeti trenera'],
   faq:['FAQ / ошибки','FAQ / mistakes','FAQ / greške'], photo:['Ссылка на фото','Photo URL','Link fotografije'],
   video:['Ссылка на видео','Video URL','Link videa'], newTemplate:['Новый шаблон','New template','Novi šablon'],
   addToTemplate:['Добавить в шаблон','Add to template','Dodaj u šablon'],
@@ -44,7 +45,7 @@ export const dictionary = {
 export type Phrase = keyof typeof dictionary;
 export function t(key:Phrase, lang:Language):string {return dictionary[key][langs.indexOf(lang)];}
 export function localized(v:Localized, lang:Language):string{return v[lang]||v.ru||v.en||v.cg||(v as Record<string,string>).sr||'';}
-export function exText(ex:Exercise, lang:Language, key:'name'|'description'|'faq'):string{
+export function exText(ex:Exercise, lang:Language, key:'name'|'description'|'coachTips'|'faq'):string{
   return ex.translations[lang]?.[key] || ex.translations.ru?.[key] || ex.translations.en?.[key] || Object.values(ex.translations).find(x=>x[key])?.[key] || '';
 }
 export const groups: Record<string,Localized>={chest:{ru:'Грудь',en:'Chest',cg:'Grudi'},back:{ru:'Спина',en:'Back',cg:'Leđa'},legs:{ru:'Ноги',en:'Legs',cg:'Noge'},core:{ru:'Кор',en:'Core',cg:'Trup'},shoulders:{ru:'Плечи',en:'Shoulders',cg:'Ramena'},arms:{ru:'Руки',en:'Arms',cg:'Ruke'},cardio:{ru:'Кардио',en:'Cardio',cg:'Kardio'},other:{ru:'Другое',en:'Other',cg:'Ostalo'}};
