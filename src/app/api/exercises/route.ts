@@ -7,19 +7,24 @@ await requireWorkspace(ws);
 const r=await query(`select e.id,e.workspace_id as "workspaceId",coalesce(o.muscle_group,e.muscle_group) as "group",
   coalesce(o.equipment,e.equipment) as equipment,coalesce(o.photo_url,e.photo_url) as "photoUrl",
   coalesce(o.video_url,e.video_url) as "videoUrl",coalesce(o.translations,e.translations) as translations,
-  (o.exercise_id is not null) as customized
+  (o.exercise_id is not null) as customized, e.is_shared as "isShared"
   from exercises e left join exercise_overrides o on o.exercise_id=e.id and o.workspace_id=$1
-  where e.workspace_id is null or e.workspace_id=$1 order by e.created_at,e.id`,[ws]);
+  where e.workspace_id is null or e.workspace_id=$1 or e.is_shared=true
+    or exists(select 1 from template_exercises te join workout_templates wt on wt.id=te.template_id
+              where te.exercise_id=e.id and wt.workspace_id=$1)
+    or exists(select 1 from assignment_exercises ae join assignments a on a.id=ae.assignment_id
+              where ae.exercise_id=e.id and a.workspace_id=$1)
+  order by e.created_at,e.id`,[ws]);
 return NextResponse.json(r.rows);
 }catch(e){return jsonError(e);}}
 export async function POST(request:Request){try{
 const b=await request.json();const ws=b.workspaceId;
 const {userId}=await requireWorkspace(ws,['coach']);
-const translations:Record<string,{name:string;description:string;faq:string}>={};
+const translations:Record<string,{name:string;description:string;coachTips:string;faq:string}>={};
 if(!b.translations||typeof b.translations!=='object')throw new ApiError(400,'Missing translations');
 for(const lang of ['ru','en','cg']){
 const v=b.translations[lang]||{};
-translations[lang]={name:parseText(v.name,120),description:parseText(v.description,3000),faq:parseText(v.faq,2000)};
+translations[lang]={name:parseText(v.name,120),description:parseText(v.description,3000),coachTips:parseText(v.coachTips,2000),faq:parseText(v.faq,2000)};
 }
 validTitle(Object.fromEntries(Object.entries(translations).map(([k,v])=>[k,v.name])));
 const group=parseText(b.group,30)||'other',equipment=parseText(b.equipment,120);
