@@ -5,7 +5,7 @@ export type HistoryVisibility = 'full' | 'summary';
 export type Localized = Partial<Record<Language,string>>;
 export type Exercise = {
   id:string; workspaceId:string|null; group:string; equipment:string;
-  photoUrl:string; videoUrl:string; translations:Record<string,{name:string;description:string;faq:string}>;customized?:boolean;
+  photoUrl:string; videoUrl:string; translations:Record<string,{name:string;description:string;coachTips?:string;faq:string}>;customized?:boolean;isShared?:boolean;
 };
 export type WorkoutItem = { id:string; exerciseId:string; sets:number; reps:number; weight:number; rest:number; };
 export type WorkoutTemplate = {id:string;workspaceId:string;title:Localized;items:WorkoutItem[];workoutType:WorkoutType};
